@@ -1,0 +1,17 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- 笔记表
+CREATE TABLE note (id SERIAL PRIMARY KEY, title TEXT, content TEXT NOT NULL,
+tags TEXT[], created_at TIMESTAMP DEFAULT now(), last_embedded_at TIMESTAMP,
+embedding VECTOR(768));
+
+-- 博客表
+CREATE TABLE blog (id SERIAL PRIMARY KEY, slug TEXT UNIQUE, title TEXT,
+body TEXT NOT NULL, author TEXT, published_at TIMESTAMP, tags TEXT[],
+last_embedded_at TIMESTAMP, embedding VECTOR(768));
+
+-- 照片表
+CREATE TABLE photo (id SERIAL PRIMARY KEY, file_path TEXT NOT NULL,
+caption TEXT, taken_at TIMESTAMP, location TEXT, camera_model TEXT,
+gps_lat DOUBLE PRECISION, gps_lng DOUBLE PRECISION, tags TEXT[],
+last_embedded_at TIMESTAMP, embedding VECTOR(768));
