@@ -51,7 +51,7 @@ def import_notes_from_directory(notes_dir: str, session: Session):
 
 
 def summarize_notes(session: Session):
-    notes = session.query(Note).filter(or_(Note.summary == None, Note.summary == "",Note.tags == None)).all()
+    notes = session.query(Note).filter(or_(Note.summary == None, Note.summary == "", Note.tags == None, Note.tags == [])).all()
     count = 0
     if not notes:
         print("没有需要总结的 Note")

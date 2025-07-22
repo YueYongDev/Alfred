@@ -4,11 +4,11 @@ from typing import Tuple, List
 from llama_index.core.llms import ChatMessage
 from llama_index.core.llms import TextBlock, ImageBlock
 
-from rag_engine.providers import get_vision_llm, get_extractor_llm
+from rag_engine.providers import get_vision_llm, get_summarize_llm
 
 
 def analyze_text(text: str) -> dict:
-    llm = get_extractor_llm()
+    llm = get_summarize_llm()
 
     prompt_txt = (
         "请对以下文本内容进行分析，总结其主要内容，并提取2-5个相关标签。内容用中文回复"

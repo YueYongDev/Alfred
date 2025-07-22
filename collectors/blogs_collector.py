@@ -1,6 +1,6 @@
+import time
 from datetime import datetime
 from pathlib import Path
-import time
 
 import frontmatter
 from sqlalchemy import or_
@@ -57,7 +57,8 @@ def import_blogs_from_directory(blog_dir: str, session: Session):
 
 
 def summarize_blogs(session: Session):
-    blogs = session.query(Blog).filter(or_(Blog.summary == None, Blog.summary == "", Blog.tags == None)).all()
+    blogs = session.query(Blog).filter(
+        or_(Blog.summary == None, Blog.summary == "", Blog.tags == None, Blog.tags == [])).all()
     count = 0
     if not blogs:
         print("没有需要总结的 Blog")

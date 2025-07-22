@@ -1,19 +1,18 @@
 import os
 import pathlib
-from datetime import datetime
 import tempfile
 import time
+from datetime import datetime
 
+import exifread
+import imageio
+import pillow_heif
+import rawpy
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
-from sqlalchemy.orm import Session
 from sqlalchemy import or_
+from sqlalchemy.orm import Session
 from tqdm import tqdm
-
-import pillow_heif
-import exifread
-import rawpy
-import imageio
 
 from db.models import Photo  # 假设你已定义好 Photo 模型
 from summarization_engine.summarizer import summarize_photo_file
@@ -23,15 +22,18 @@ pillow_heif.register_heif_opener()
 
 def extract_exif_info(file_path: str):
     """优先用 exifread 解析 EXIF 信息，兼容 JPEG/HEIC，兜底用 PIL"""
+
     def exifread_gps(tags):
         def get_tag(name):
             return tags.get(name)
+
         def to_deg(val):
             # exifread 返回 Ratio 对象
             if val and hasattr(val, '__iter__') and len(val) == 3:
                 d, m, s = val
                 return float(d) + float(m) / 60 + float(s) / 3600
             return None
+
         lat = get_tag('GPS GPSLatitude')
         lat_ref = get_tag('GPS GPSLatitudeRef')
         lng = get_tag('GPS GPSLongitude')
@@ -46,6 +48,7 @@ def extract_exif_info(file_path: str):
             if lng_deg is not None:
                 gps_lng = lng_deg if lng_ref.values[0] in ['E', b'E'] else -lng_deg
         return gps_lat, gps_lng
+
     try:
         with open(file_path, 'rb') as f:
             tags = exifread.process_file(f, details=False)
@@ -70,6 +73,7 @@ def extract_exif_info(file_path: str):
                 for t in gps_info
                 if t in GPSTAGS
             }
+
             def to_deg(val):
                 if isinstance(val, (list, tuple)) and len(val) == 3:
                     def frac(x):
@@ -79,12 +83,14 @@ def extract_exif_info(file_path: str):
                             return float(x)
                         except Exception:
                             return 0.0
+
                     d, m, s = val
                     return frac(d) + frac(m) / 60 + frac(s) / 3600
                 try:
                     return float(val)
                 except Exception:
                     return None
+
             lat = gps.get("GPSLatitude")
             lng = gps.get("GPSLongitude")
             lat_ref = gps.get("GPSLatitudeRef")
@@ -157,7 +163,8 @@ def import_photo_from_directory(photo_dir: str, session: Session):
 
 
 def summarize_photos(session: Session):
-    photos = session.query(Photo).filter(or_(Photo.summary == None, Photo.summary == "", Photo.tags == None)).all()
+    photos = session.query(Photo).filter(
+        or_(Photo.summary == None, Photo.summary == "", Photo.tags == None, Photo.tags == [])).all()
     count = 0
     if not photos:
         print("没有需要总结的 Photo")
