@@ -4,7 +4,7 @@ from typing import Tuple, List
 from llama_index.core.llms import ChatMessage
 from llama_index.core.llms import TextBlock, ImageBlock
 
-from rag_engine.providers import get_vision_llm, get_summarize_llm
+from llm.providers import get_vision_llm, get_summarize_llm
 
 
 def analyze_text(text: str) -> dict:
@@ -43,9 +43,16 @@ def analyze_photo(image_path: str) -> dict:
     llm = get_vision_llm()
 
     prompt_txt = (
-        "请分析这张图片，总结其主要内容，并提取2-5个相关标签。内容用中文回复"
-        "返回严格的 JSON，格式如下：\n"
-        '{"description":"...","tags":["tag1","tag2"]}'
+        "请仔细分析这张图片，详细描述图片的主要内容，包括但不限于："
+        "主体物体、颜色、环境背景、光线状况、可能的拍摄设备、物体之间的关系、材质等。"
+        "请避免模糊描述，尽量具体且详细。"
+        "这段描述会用于后续的智能问答系统，要求信息详尽且准确。"
+        "然后提取2-5个与图片内容高度相关的标签。"
+        "请用中文回复，并返回严格的JSON格式，格式如下：\n"
+        '{"description":"详细描述内容...","tags":["标签1","标签2"]}\n'
+        "例如：\n"
+        '{"description": "图片中有一台银色的富士XE3相机，放置在白色桌面上，背景是绿色植物。", '
+        '"tags": ["富士XE3", "相机", "桌面", "植物"]}'
     )
 
     messages = [
@@ -59,7 +66,6 @@ def analyze_photo(image_path: str) -> dict:
     ]
 
     try:
-        # ① 发送请求
         resp = llm.chat(messages)
         raw = resp.message.content.strip()
         data = json.loads(raw)
@@ -67,7 +73,8 @@ def analyze_photo(image_path: str) -> dict:
 
     except Exception as e:
         print(f"[Warning] analyze_photo({image_path}) failed → {e}")
-        return {"description": "", "tags": ""}
+        return {"description": "", "tags": []}
+
 
 def summarize_text_file(file_path: str) -> Tuple[str, List[str]]:
     with open(file_path, "r", encoding="utf-8") as file:
@@ -76,6 +83,7 @@ def summarize_text_file(file_path: str) -> Tuple[str, List[str]]:
     summary = result.get("description") or ""
     tags = result.get("tags") or []
     return summary, tags
+
 
 def summarize_photo_file(image_path: str) -> Tuple[str, List[str]]:
     try:
@@ -89,8 +97,8 @@ def summarize_photo_file(image_path: str) -> Tuple[str, List[str]]:
 
 
 if __name__ == '__main__':
-    image_path="/Users/yueyong/alfred_test_data/photos/0.png"
-    file_path="/Users/yueyong/alfred_test_data/blogs/技术科普/浅谈策略模式在消息转发场景下的应用.md"
+    image_path = "/Users/yueyong/alfred_test_data/photos/5F6DE366-A1E4-433A-90C7-79048CB7B7DE.jpg"
+    file_path = "/Users/yueyong/alfred_test_data/blogs/技术科普/浅谈策略模式在消息转发场景下的应用.md"
 
     image_summary, image_tags = summarize_photo_file(image_path)
     file_summary, file_tags = summarize_text_file(file_path)

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from db.models import Photo  # 假设你已定义好 Photo 模型
-from summarization_engine.summarizer import summarize_photo_file
+from summarizer.summarizer import summarize_photo_file
 
 pillow_heif.register_heif_opener()
 

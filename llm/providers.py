@@ -1,9 +1,7 @@
-from llama_index.core import ChatPromptTemplate
-from llama_index.core.base.llms.types import MessageRole, ChatMessage
 from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.llms.ollama import Ollama
 
-from rag_engine import config
+from server import config
 
 
 def get_llm():
@@ -11,6 +9,7 @@ def get_llm():
         base_url=config.OPENAI_BASE_URL,
         model=config.BASE_MODEL,
         request_timeout=600,
+        tools=False,
     )
 
 

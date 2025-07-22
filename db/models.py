@@ -1,8 +1,10 @@
 # db/models.py
-from sqlalchemy.ext.declarative import declarative_base
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, Integer, Text, ARRAY, TIMESTAMP, Double
+from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
+
 
 class Note(Base):
     __tablename__ = "note"
@@ -15,6 +17,7 @@ class Note(Base):
     created_at = Column(TIMESTAMP)
     last_summarized_at = Column(TIMESTAMP)
     last_embedded_at = Column(TIMESTAMP)
+
 
 class Blog(Base):
     __tablename__ = "blog"
@@ -30,6 +33,7 @@ class Blog(Base):
     last_summarized_at = Column(TIMESTAMP)
     last_embedded_at = Column(TIMESTAMP)
 
+
 class Photo(Base):
     __tablename__ = "photo"
     id = Column(Integer, primary_key=True)
@@ -44,3 +48,12 @@ class Photo(Base):
     summary = Column(Text)
     last_summarized_at = Column(TIMESTAMP)
     last_embedded_at = Column(TIMESTAMP)
+
+
+class UnifiedEmbedding(Base):
+    __tablename__ = "unified_embeddings"
+    id = Column(Integer, primary_key=True)
+    entry_type = Column(Text)
+    entry_id = Column(Integer)
+    text = Column(Text)
+    embedding = Column(Vector(1024))  # 用 Vector 而不是 VECTOR

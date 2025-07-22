@@ -25,3 +25,4 @@ llama-index-core~=0.12.49
 pydantic~=2.11.7
 python-frontmatter~=1.1.0
 exifread~=3.3.2
+requests

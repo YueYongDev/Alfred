@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from db.models import Blog
-from summarization_engine.summarizer import summarize_text_file
+from summarizer.summarizer import summarize_text_file
 
 
 def import_blogs_from_directory(blog_dir: str, session: Session):

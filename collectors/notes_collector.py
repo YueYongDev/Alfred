@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from tqdm import tqdm
 
 from db.models import Note
-from summarization_engine.summarizer import summarize_text_file
+from summarizer.summarizer import summarize_text_file
 
 
 def import_notes_from_directory(notes_dir: str, session: Session):
