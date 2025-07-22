@@ -10,7 +10,7 @@ load_dotenv()
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
 OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "ollama")
 
-EXTRACTION_MODEL = os.getenv("EXTRACTION_MODEL", "gemma3:1b")
+SUMMARIZE_MODEL = os.getenv("SUMMARIZE_MODEL", "gemma3:4b")
 BASE_MODEL       = os.getenv("BASE_MODEL",       "gemma3:4b")
 EMBEDDING_MODEL  = os.getenv("EMBEDDING_MODEL",  "bge-m3:latest")
 VISION_LLM_MODEL = os.getenv("VISION_LLM_MODEL", "gemma3:4b")

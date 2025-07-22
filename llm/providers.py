@@ -16,22 +16,9 @@ def get_llm():
 def get_summarize_llm():
     return Ollama(
         base_url=config.OPENAI_BASE_URL,
-        model=config.BASE_MODEL,
+        model=config.SUMMARIZE_MODEL,
         request_timeout=600,
         json_mode=True,
-    )
-
-
-def get_extractor_llm():
-    return Ollama(
-        base_url=config.OPENAI_BASE_URL,
-        model=config.EXTRACTION_MODEL,
-        request_timeout=600,
-        temperature=0.1,  # 降低随机性
-        top_k=20,  # 限制候选词数量
-        top_p=0.9,  # 核采样
-        num_predict=256,  # 限制输出长度
-        num_ctx=2048,  # 上下文长度
     )
 
 
