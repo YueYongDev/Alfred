@@ -101,10 +101,10 @@ if __name__ == '__main__':
     file_path = "/Users/yueyong/alfred_test_data/blogs/技术科普/浅谈策略模式在消息转发场景下的应用.md"
 
     image_summary, image_tags = summarize_photo_file(image_path)
-    file_summary, file_tags = summarize_text_file(file_path)
+    # file_summary, file_tags = summarize_text_file(file_path)
 
     print(f"Image Summary: {image_summary}")
     print(f"Image Tags: {image_tags}")
 
-    print(f"File Summary: {file_summary}")
-    print(f"File Tags: {file_tags}")
+    # print(f"File Summary: {file_summary}")
+    # print(f"File Tags: {file_tags}")

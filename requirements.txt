@@ -19,10 +19,12 @@ llama-index-llms-ollama
 llama-index-embeddings-ollama
 psycopg2
 sqlalchemy~=2.0.41
-pgvector
+pgvector~=0.4.1
 psycopg2-binary
 llama-index-core~=0.12.49
 pydantic~=2.11.7
 python-frontmatter~=1.1.0
 exifread~=3.3.2
 requests
+imageio~=2.37.0
+rawpy
