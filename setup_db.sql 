@@ -3,8 +3,8 @@ CREATE TABLE note (
     file_path TEXT NOT NULL,
     title TEXT,
     content TEXT NOT NULL,
-    tags TEXT[],  -- ARRAY(Text)
-    summary TEXT,
+    ai_tags TEXT[],  -- ARRAY(Text)
+    ai_summary TEXT,
     created_at TIMESTAMP,
     last_summarized_at TIMESTAMP,
     last_embedded_at TIMESTAMP
@@ -13,13 +13,13 @@ CREATE TABLE note (
 CREATE TABLE blog (
     id SERIAL PRIMARY KEY,
     file_path TEXT NOT NULL,
-    slug TEXT UNIQUE,
+    slug TEXT,
     title TEXT,
     body TEXT NOT NULL,
     author TEXT,
     published_at TIMESTAMP,
-    tags TEXT[],  -- ARRAY(Text)
-    summary TEXT,
+    ai_tags TEXT[],  -- ARRAY(Text)
+    ai_summary TEXT,
     last_summarized_at TIMESTAMP,
     last_embedded_at TIMESTAMP
 );
@@ -33,11 +33,41 @@ CREATE TABLE photo (
     camera_model TEXT,
     gps_lat DOUBLE PRECISION,
     gps_lng DOUBLE PRECISION,
-    tags TEXT[],  -- ARRAY(Text)
-    summary TEXT,
+    ai_tags TEXT[],  -- ARRAY(Text)
+    ai_summary TEXT,
     last_summarized_at TIMESTAMP,
     last_embedded_at TIMESTAMP
 );
+
+CREATE TABLE rednote (
+    note_id TEXT PRIMARY KEY,
+    note_url TEXT,
+    note_type TEXT,
+    user_id TEXT,
+    home_url TEXT,
+    nickname TEXT,
+    avatar TEXT,
+    title TEXT,
+    description TEXT,
+    liked_count INTEGER,
+    collected_count INTEGER,
+    comment_count INTEGER,
+    share_count INTEGER,
+    video_cover TEXT,
+    video_addr TEXT,
+    image_list TEXT[],
+    tags TEXT[],
+    upload_time TIMESTAMP,
+    ip_location TEXT,
+    last_update_time TIMESTAMP,
+    ai_tags TEXT[],
+    ai_summary TEXT,
+    video_download_at TIMESTAMP,
+    image_download_at TIMESTAMP,
+    last_summarized_at TIMESTAMP,
+    last_embedded_at TIMESTAMP
+);
+
 
 -- 先安装 pgvector 扩展（只需一次）：
 CREATE EXTENSION IF NOT EXISTS vector;

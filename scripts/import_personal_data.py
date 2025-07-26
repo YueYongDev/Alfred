@@ -8,14 +8,15 @@ from tqdm import tqdm
 from collectors.blogs_collector import import_blogs_from_directory, summarize_blogs
 from collectors.notes_collector import import_notes_from_directory, summarize_notes
 from collectors.photos_collector import import_photo_from_directory, summarize_photos
+from server import config
 
 
 # === 主入口 ===
 def main():
     # === 配置你的文件夹路径（替换为实际路径） ===
-    NOTES_DIR = os.getenv("NOTES_DIR", "/Users/yueyong/alfred_test_data/notes")
-    BLOGS_DIR = os.getenv("BLOGS_DIR", "/Users/yueyong/alfred_test_data/blogs")
-    PHOTOS_DIR = os.getenv("PHOTOS_DIR", "/Users/yueyong/alfred_test_data/photos")
+    NOTES_DIR = config.NOTES_DIR
+    BLOGS_DIR = config.BLOGS_DIR
+    PHOTOS_DIR = config.PHOTOS_DIR
 
     # === 数据库连接配置 ===
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/alfred")
@@ -25,10 +26,10 @@ def main():
 
     steps = [
         ("📥 正在导入笔记 ...", lambda: import_notes_from_directory(NOTES_DIR, session)),
-        ("📝 正在总结笔记 ...", lambda: summarize_notes(session)),
         ("📥 正在导入博客 ...", lambda: import_blogs_from_directory(BLOGS_DIR, session)),
-        ("📝 正在总结博客 ...", lambda: summarize_blogs(session)),
         ("📷 正在导入照片 EXIF 信息 ...", lambda: import_photo_from_directory(PHOTOS_DIR, session)),
+        ("📝 正在总结博客 ...", lambda: summarize_blogs(session)),
+        ("📝 正在总结笔记 ...", lambda: summarize_notes(session)),
         ("📝 正在总结照片 ...", lambda: summarize_photos(session)),
     ]
     for desc, func in steps:
@@ -36,6 +37,7 @@ def main():
         start_time = time.time()
         func()
         elapsed = time.time() - start_time
+        print(f"{desc} took {elapsed:.2f} seconds")
     tqdm.write("✅ 全部导入完成")
     session.close()
 

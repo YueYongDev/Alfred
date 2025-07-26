@@ -1,6 +1,6 @@
+import time
 from datetime import datetime
 from pathlib import Path
-import time
 
 import frontmatter
 from sqlalchemy import or_
@@ -11,6 +11,38 @@ from db.models import Note
 from summarizer.summarizer import summarize_text_file
 
 
+def _process_single_note_file(md_file, session):
+    """处理单个笔记文件"""
+    try:
+        post = frontmatter.load(md_file)
+        title = post.get("title") or md_file.stem
+        content = post.content
+        ai_tags = post.get("tags") or []
+        created_at = post.get("created_at") or datetime.fromtimestamp(md_file.stat().st_mtime)
+
+        # 查找是否已存在同名文件
+        existing_note = session.query(Note).filter_by(file_path=str(md_file)).first()
+        if existing_note:
+            existing_note.title = title
+            existing_note.content = content
+            existing_note.ai_tags = ai_tags
+            existing_note.created_at = created_at
+            return "update"
+        else:
+            note = Note(
+                title=title,
+                content=content,
+                ai_tags=ai_tags,
+                created_at=created_at,
+                file_path=str(md_file)
+            )
+            session.add(note)
+            return "insert"
+    except Exception as e:
+        print(f"[⚠️] 导入 Note 文件失败: {md_file} - {e}")
+        return None
+
+
 def import_notes_from_directory(notes_dir: str, session: Session):
     """递归读取 notes 目录下的 Markdown 文件，并写入 note 表，若文件名已存在则更新"""
     md_files = list(Path(notes_dir).rglob("*.md"))
@@ -18,51 +50,46 @@ def import_notes_from_directory(notes_dir: str, session: Session):
     count_update = 0
     use_tqdm = len(md_files) > 10000
     iterator = tqdm(md_files, desc="导入笔记", unit="file") if use_tqdm else md_files
+    
     for md_file in iterator:
-        try:
-            post = frontmatter.load(md_file)
-            title = post.get("title") or md_file.stem
-            content = post.content
-            tags = post.get("tags") or []
-            created_at = post.get("created_at") or datetime.fromtimestamp(md_file.stat().st_mtime)
-
-            # 查找是否已存在同名文件
-            existing_note = session.query(Note).filter_by(file_path=str(md_file)).first()
-            if existing_note:
-                existing_note.title = title
-                existing_note.content = content
-                existing_note.tags = tags
-                existing_note.created_at = created_at
-                count_update += 1
-            else:
-                note = Note(
-                    title=title,
-                    content=content,
-                    tags=tags,
-                    created_at=created_at,
-                    file_path=str(md_file)
-                )
-                session.add(note)
-                count_insert += 1
-        except Exception as e:
-            print(f"[⚠️] 导入 Note 文件失败: {md_file} - {e}")
-    session.commit()
+        result = _process_single_note_file(md_file, session)
+        if result == "insert":
+            count_insert += 1
+        elif result == "update":
+            count_update += 1
+        session.commit()
+        
     print(f"✅ 新增 {count_insert} 条 Note，更新 {count_update} 条 Note 数据")
 
 
+def _process_single_note_summary(note, session):
+    """处理单个笔记的AI摘要"""
+    try:
+        ai_summary, ai_tags = summarize_text_file(note.file_path)
+        note.ai_summary = ai_summary
+        note.ai_tags = ai_tags
+        note.last_summarized_at = datetime.now()
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"[⚠️] 笔记分析失败: {note.file_path} - {e}")
+        return False
+
+
 def summarize_notes(session: Session):
-    notes = session.query(Note).filter(or_(Note.summary == None, Note.summary == "", Note.tags == None, Note.tags == [])).all()
-    count = 0
+    notes = (session.query(Note)
+             .filter(or_(Note.ai_summary == None, Note.ai_summary == "", Note.ai_tags == None, Note.ai_tags == []))
+             .all())
     if not notes:
         print("没有需要总结的 Note")
         return
+    
+    count = 0
     start_time = time.time()
+    
     for note in tqdm(notes, desc="总结笔记", unit="note"):
-        summary, tags = summarize_text_file(note.file_path)
-        note.summary = summary
-        note.tags = tags
-        note.last_summarized_at = datetime.now()
-        count += 1
-    session.commit()
+        if _process_single_note_summary(note, session):
+            count += 1
+    
     elapsed = time.time() - start_time
     print(f"✅ Note 总结完成，共处理 {count} 条，用时 {elapsed:.2f} 秒")

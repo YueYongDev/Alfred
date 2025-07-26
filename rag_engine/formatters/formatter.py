@@ -31,3 +31,27 @@ def format_photo(photo) -> str:
 标签：{", ".join(photo.tags or [])}
 描述：{photo.summary or ""}
 """
+
+
+def format_rednote(rednote) -> str:
+    return f"""[小红书笔记]
+笔记id：{rednote.note_id}
+笔记url：{rednote.note_url}
+笔记类型：{rednote.note_type}
+用户id：{rednote.user_id}
+用户主页url：{rednote.home_url}
+昵称：{rednote.nickname}
+头像url：{rednote.avatar}
+标题：{rednote.title}
+描述：{rednote.description}
+点赞数量：{rednote.liked_count}
+收藏数量：{rednote.collected_count}
+评论数量：{rednote.comment_count}
+分享数量：{rednote.share_count}
+视频封面url：{rednote.video_cover}
+视频地址url：{rednote.video_addr}
+图片地址url列表：{', '.join(rednote.image_list or [])}
+标签：{", ".join(rednote.tags or [])}
+上传时间：{rednote.upload_time}
+ip归属地：{rednote.ip_location}
+"""
