@@ -26,7 +26,7 @@ async def initialize_rag():
         llm_model_kwargs={
             "host": config.OPENAI_BASE_URL,
             "options": {"num_ctx": 8192},
-            "timeout": int(os.getenv("TIMEOUT", "300")),
+            "timeout": int(os.getenv("TIMEOUT", "6000")),
         },
         # 使用Ollama嵌入函数
         embedding_func=EmbeddingFunc(
@@ -36,6 +36,7 @@ async def initialize_rag():
                 texts,
                 embed_model=config.EMBEDDING_MODEL,
                 host=config.OPENAI_BASE_URL,
+                timeout=6000
             )
         ),
         kv_storage="PGKVStorage",
