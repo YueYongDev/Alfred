@@ -252,12 +252,23 @@ def summarize_photos(session: Session):
         print("没有需要总结的 Photo")
         return
     
+    import concurrent.futures
+    from threading import Lock
+    
     count = 0
+    count_lock = Lock()
     start_time = time.time()
     
-    for photo in tqdm(photos, desc="总结照片", unit="photo"):
-        if _process_single_photo_summary(photo, session):
-            count += 1
+    # 使用 ThreadPoolExecutor 开两个线程并行处理
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        # 提交任务到线程池
+        future_to_photo = {executor.submit(_process_single_photo_summary, photo, session): photo for photo in photos}
+        
+        # 使用 tqdm 显示进度
+        for future in tqdm(concurrent.futures.as_completed(future_to_photo), total=len(photos), desc="总结照片", unit="photo"):
+            if future.result():
+                with count_lock:
+                    count += 1
     
     elapsed = time.time() - start_time
     print(f"✅ Photo 总结完成，共处理 {count} 条，用时 {elapsed:.2f} 秒")

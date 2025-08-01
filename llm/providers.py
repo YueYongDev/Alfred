@@ -8,7 +8,7 @@ def get_llm():
     return Ollama(
         base_url=config.OPENAI_BASE_URL,
         model=config.BASE_MODEL,
-        request_timeout=600,
+        request_timeout=6000,
         tools=False,
     )
 
@@ -35,6 +35,6 @@ def get_vision_llm():
     return Ollama(
         base_url=config.OPENAI_BASE_URL,
         model=config.VISION_LLM_MODEL,
-        timeout=1200,
+        timeout=6000,
         json_mode=True
     )
