@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import time
 from typing import Tuple, List
@@ -91,7 +92,6 @@ def analyze_photo(image_path: str) -> dict:
 
     try:
         processed_path = resize_image(image_path, max_size=(1024, 1024))
-
         messages = [
             ChatMessage(
                 role="user",
@@ -113,7 +113,7 @@ def analyze_photo(image_path: str) -> dict:
         print(f"[Error] 模型返回非 JSON → {e, raw}")
         return {"description": "", "tags": []}
     except Exception as e:
-        print(f"[Error] analyze_photo({image_path}) failed → {e.args}")
+        print(f"[Error] analyze_photo({image_path}) failed → {e}")
         return {"description": "", "tags": []}
 
 

@@ -115,7 +115,7 @@ def _process_single_photo(file_path, session):
         stat = os.stat(file_path)
         taken_at = datetime.fromtimestamp(stat.st_mtime)
         camera_model, gps_lat, gps_lng = extract_exif_info(file_path)
-        
+
         # 不再跳过任何图片，所有图片都插入/更新数据库
         existing_photo = session.query(Photo).filter_by(file_path=file_path).first()
         if existing_photo:
@@ -153,27 +153,27 @@ def import_photo_from_directory(photo_dir: str, session: Session):
         ".jpg", ".jpeg", ".png", ".webp", ".heic",
         ".cr2", ".nef", ".arw", ".dng", ".raf", ".rw2", ".orf", ".sr2", ".pef", ".cr3", ".raw"
     ]
-    
+
     # 收集所有照片文件
     photo_files = []
     for root, _, files in os.walk(photo_dir):
         for file in files:
             if pathlib.Path(file).suffix.lower() in image_exts:
                 photo_files.append(os.path.join(root, file))
-    
+
     # 处理照片文件
     count_insert = 0
     count_update = 0
     use_tqdm = len(photo_files) > 10000
     iterator = tqdm(photo_files, desc="导入照片", unit="file") if use_tqdm else photo_files
-    
+
     for file_path in iterator:
         result = _process_single_photo(file_path, session)
         if result == "insert":
             count_insert += 1
         elif result == "update":
             count_update += 1
-    
+
     session.commit()
     print(f"✅ 新增 {count_insert} 张照片，更新 {count_update} 张照片")
 
@@ -182,12 +182,12 @@ def _process_single_photo_summary(photo, session):
     """处理单个照片的AI摘要"""
     if not photo.file_path:
         return False
-        
+
     try:
         file_path = photo.file_path
         ext = pathlib.Path(file_path).suffix.lower()
         RAW_EXTS = [".cr2", ".nef", ".arw", ".dng", ".raf", ".rw2", ".orf", ".sr2", ".pef", ".cr3", ".raw"]
-        
+
         # 根据文件类型处理照片
         if ext in [".heic", ".heif"]:
             return _process_heic_photo(file_path, photo, session)
@@ -209,7 +209,7 @@ def _process_heic_photo(file_path, photo, session):
             tmp_jpg_path = tmp.name
     ai_summary, ai_tags = summarize_photo_file(tmp_jpg_path)
     os.remove(tmp_jpg_path)
-    
+
     photo.ai_summary = ai_summary
     photo.ai_tags = ai_tags
     photo.last_summarized_at = datetime.now()
@@ -227,7 +227,7 @@ def _process_raw_photo(file_path, photo, session):
             tmp_jpg_path = tmp.name
     ai_summary, ai_tags = summarize_photo_file(tmp_jpg_path)
     os.remove(tmp_jpg_path)
-    
+
     photo.ai_summary = ai_summary
     photo.ai_tags = ai_tags
     photo.last_summarized_at = datetime.now()
@@ -251,24 +251,13 @@ def summarize_photos(session: Session):
     if not photos:
         print("没有需要总结的 Photo")
         return
-    
-    import concurrent.futures
-    from threading import Lock
-    
+
     count = 0
-    count_lock = Lock()
     start_time = time.time()
-    
-    # 使用 ThreadPoolExecutor 开两个线程并行处理
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        # 提交任务到线程池
-        future_to_photo = {executor.submit(_process_single_photo_summary, photo, session): photo for photo in photos}
-        
-        # 使用 tqdm 显示进度
-        for future in tqdm(concurrent.futures.as_completed(future_to_photo), total=len(photos), desc="总结照片", unit="photo"):
-            if future.result():
-                with count_lock:
-                    count += 1
-    
+
+    for photo in tqdm(photos, desc="总结照片", unit="photo"):
+        if _process_single_photo_summary(photo, session):
+            count += 1
+
     elapsed = time.time() - start_time
     print(f"✅ Photo 总结完成，共处理 {count} 条，用时 {elapsed:.2f} 秒")
