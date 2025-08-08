@@ -20,7 +20,7 @@ def main():
     PHOTOS_DIR = config.PHOTOS_DIR
 
     # === 数据库连接配置 ===
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/alfred")
+    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@192.168.100.197:5432/alfred")
     engine = create_engine(DATABASE_URL)
     Session = sessionmaker(bind=engine)
     session = Session()
