@@ -298,8 +298,8 @@ def import_photo_from_photoprism(client: Client, session: Session):
             existing_photo.gps_lat = gps_lat
             existing_photo.gps_lng = gps_lng
             # 重置AI分析字段，以便重新分析
-            existing_photo.ai_summary = None
-            existing_photo.ai_tags = []
+            # existing_photo.ai_summary = None
+            # existing_photo.ai_tags = []
             result = "update"
         else:
             # 创建新记录
