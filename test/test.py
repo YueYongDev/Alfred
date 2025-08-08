@@ -1,7 +1,7 @@
 import tempfile
 import os
 from summarizer.summarizer import analyze_photo  # 你已有的分析函数
-from client.photoprism_api_client import Client  # 你手写的 REST 客户端
+from client.photoprism_client import Client  # 你手写的 REST 客户端
 
 def analyze_photo_from_photoprism(uid: str, client: Client) -> dict:
     """

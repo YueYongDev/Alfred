@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # —— LLM & Embedding ——
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL","127.0.0.1:11434")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "ollama")
 
 SUMMARIZE_MODEL = os.getenv("SUMMARIZE_MODEL", "gemma3:4b")

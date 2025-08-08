@@ -1,272 +1,136 @@
-import time
+import json
+import os
+import tempfile
 from datetime import datetime
+from typing import Optional, Dict
 
-from loguru import logger
-from sqlalchemy import or_, and_
 from tqdm import tqdm
 
-from apis.xhs_pc_apis import XHS_Apis
-from db.database import SessionLocal
-from db.models import Rednote
-from server import config
-from xhs_utils.data_util import handle_note_info, download_note
-
-# 配置日志输出
-logger.add("logs/spider_{time}.log", rotation="500 MB", encoding="utf-8", enqueue=True, retention="10 days")
+from client.immich_client import ImmichClient
+from summarizer.summarizer import summarize_photo_file
 
 
-def save_note_to_db(note_info):
+def analyze_immich_photos(client: ImmichClient, output_file: str = "immich_analysis.json"):
     """
-    将单个笔记信息保存到数据库
-    :param note_info:
-    :return:
+    分析 Immich 中的所有照片并保存结果到 JSON 文件
     """
-    session = SessionLocal()
     try:
-        # 检查是否已存在
-        existing_note = session.query(Rednote).filter(Rednote.note_id == note_info['note_id']).first()
+        # 获取所有图片
+        photos = client.get_all_assets(asset_type='IMAGE')
+        print(f"✅ 获取 Immich 中的图片列表成功！共 {len(photos)} 张照片")
 
-        if existing_note:
-            # 更新现有记录
-            existing_note.note_url = note_info.get('note_url')
-            existing_note.note_type = note_info.get('note_type')
-            existing_note.user_id = note_info.get('user_id')
-            existing_note.home_url = note_info.get('home_url')
-            existing_note.nickname = note_info.get('nickname')
-            existing_note.avatar = note_info.get('avatar')
-            existing_note.title = note_info.get('title')
-            existing_note.desc = note_info.get('desc')
-            existing_note.liked_count = note_info.get('liked_count', 0)
-            existing_note.collected_count = note_info.get('collected_count', 0)
-            existing_note.comment_count = note_info.get('comment_count', 0)
-            existing_note.share_count = note_info.get('share_count', 0)
-            existing_note.video_cover = note_info.get('video_cover')
-            existing_note.video_addr = note_info.get('video_addr')
-            existing_note.image_list = note_info.get('image_list', [])
-            existing_note.tags = note_info.get('tags', [])
-            existing_note.upload_time = datetime.strptime(note_info.get('upload_time'),
-                                                          "%Y-%m-%d %H:%M:%S") if note_info.get(
-                'upload_time') else None
-            existing_note.ip_location = note_info.get('ip_location')
-            existing_note.last_update_time = datetime.now()
-        else:
-            # 创建新记录
-            db_note = Rednote(
-                note_id=note_info.get('note_id'),
-                note_url=note_info.get('note_url'),
-                note_type=note_info.get('note_type'),
-                user_id=note_info.get('user_id'),
-                home_url=note_info.get('home_url'),
-                nickname=note_info.get('nickname'),
-                avatar=note_info.get('avatar'),
-                title=note_info.get('title'),
-                description=note_info.get('desc'),
-                liked_count=note_info.get('liked_count', 0),
-                collected_count=note_info.get('collected_count', 0),
-                comment_count=note_info.get('comment_count', 0),
-                share_count=note_info.get('share_count', 0),
-                video_cover=note_info.get('video_cover'),
-                video_addr=note_info.get('video_addr'),
-                image_list=note_info.get('image_list', []),
-                tags=note_info.get('tags', []),
-                upload_time=datetime.strptime(note_info.get('upload_time'), "%Y-%m-%d %H:%M:%S") if note_info.get(
-                    'upload_time') else None,
-                ip_location=note_info.get('ip_location'),
-                last_update_time=datetime.now()
-            )
-            session.add(db_note)
-
-        session.commit()
-        logger.info(f"笔记 {note_info.get('note_id')} 已保存到数据库")
-        return True
     except Exception as e:
-        session.rollback()
-        logger.error(f"保存笔记 {note_info.get('note_id')} 到数据库时出错: {e}")
-        return False
-    finally:
-        session.close()
-
-
-def download_note_media():
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    import threading
-
-    local = threading.local()
-
-    def get_session():
-        if not hasattr(local, 'session'):
-            local.session = SessionLocal()
-        return local.session
-
-    def download_single_note(note_info):
-        session = get_session()
-        save_path = download_note(note_info, config.REDNOTE_DIR)
-        if save_path:
-            logger.info(f"笔记 {note_info.note_id} 下载成功，保存路径: {save_path}")
-            try:
-                db_note = session.query(Rednote).filter(Rednote.note_id == note_info.note_id).first()
-                if db_note:
-                    if note_info.note_type == '图集':
-                        db_note.image_download_at = datetime.now()
-                    elif note_info.note_type == '视频':
-                        db_note.video_download_at = datetime.now()
-                    session.commit()
-                return True, note_info.note_id, save_path
-            except Exception as e:
-                session.rollback()
-                logger.error(f"更新笔记 {note_info.note_id} 下载时间时出错: {e}")
-                return False, note_info.note_id, str(e)
-        else:
-            logger.error(f"笔记 {note_info.note_id} 下载失败")
-            return False, note_info.note_id, "下载失败"
-
-    session = SessionLocal()
-    rednoteList = (session.query(Rednote)
-                   .filter(or_(
-        # 图文笔记：image_download_at 为空
-        and_(Rednote.note_type == '图集', Rednote.image_download_at == None),
-        # 视频笔记：video_download_at 为空
-        and_(Rednote.note_type == '视频', Rednote.video_download_at == None)
-    ))
-                   .all())
-    if not rednoteList:
-        print("没有需要下载的帖子")
-        session.close()
+        print(f"❌ 获取 Immich 资产失败: {e}")
         return
 
-    start_time = time.time()
-    success_count = 0
+    results = []
+    count_analyzed = 0
 
-    # 使用线程池进行多线程下载
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        # 提交所有任务
-        future_to_note = {executor.submit(download_single_note, note_info): note_info for note_info in rednoteList}
-
-        # 处理完成的任务
-        for future in tqdm(as_completed(future_to_note), total=len(rednoteList), desc="下载小红书", unit="note"):
-            try:
-                success, note_id, result = future.result()
-                if success:
-                    success_count += 1
-                else:
-                    logger.error(f"笔记 {note_id} 处理失败: {result}")
-            except Exception as e:
-                note_info = future_to_note[future]
-                logger.error(f"处理笔记 {note_info.note_id} 时发生异常: {e}")
-
-    elapsed = time.time() - start_time
-    session.close()
-    print(f"✅ 小红书帖子下载完成，共处理 {success_count} 条，用时 {elapsed:.2f} 秒")
-
-
-class DataSpider:
-    def __init__(self):
-        self.xhs_apis = XHS_Apis()
-
-    def spider_note(self, note_url: str, cookies_str: str, proxies=None):
-        """
-        爬取一个笔记的信息
-        :param note_url:
-        :param cookies_str:
-        :return:
-        """
-        note_info = None
+    for asset_data in tqdm(photos, desc="分析 Immich 照片", unit="photo"):
         try:
-            success, msg, note_info = self.xhs_apis.get_note_info(note_url, cookies_str, proxies)
-            if success:
-                note_info = note_info['data']['items'][0]
-                note_info['url'] = note_url
-                note_info = handle_note_info(note_info)
+            asset_id = asset_data['id']
+            original_filename = asset_data.get('originalFileName', '')
+            original_path = asset_data.get('originalPath', '')
+
+            # 分析照片
+            analysis_result = _analyze_single_photo(client, asset_id)
+
+            if analysis_result:
+                # 组合结果
+                photo_result = {
+                    'asset_id': asset_id,
+                    'filename': original_filename,
+                    'path': original_path,
+                    'file_created_at': asset_data.get('fileCreatedAt'),
+                    'ai_summary': analysis_result['summary'],
+                    'ai_tags': analysis_result['tags'],
+                    'analyzed_at': datetime.now().isoformat()
+                }
+
+                # 获取详细信息（EXIF等）
+                try:
+                    asset_info = client.get_asset_info(asset_id)
+                    exif_info = asset_info.get('exifInfo', {})
+                    if exif_info:
+                        photo_result['camera_make'] = exif_info.get('make')
+                        photo_result['camera_model'] = exif_info.get('model')
+                        photo_result['gps_lat'] = exif_info.get('latitude')
+                        photo_result['gps_lng'] = exif_info.get('longitude')
+                except Exception as e:
+                    print(f"[⚠️] 获取 EXIF 信息失败: {asset_id} - {e}")
+
+                results.append(photo_result)
+                count_analyzed += 1
+
+                # 实时显示分析结果
+                print(f"📷 {original_filename}")
+                print(f"   摘要: {analysis_result['summary'][:100]}...")
+                print(f"   标签: {', '.join(analysis_result['tags'][:5])}")
+                print()
+
         except Exception as e:
-            success = False
-            msg = e
-        logger.info(f'爬取笔记信息 {note_url}: {success}, msg: {msg}')
-        return success, msg, note_info
+            print(f"[⚠️] 分析照片失败: {asset_data.get('id', 'unknown')} - {e}")
+            continue
 
-    def spider_some_note(self, notes: list, cookies_str: str, proxies=None):
-        """
-        爬取一些笔记的信息
-        :param notes:
-        :param cookies_str:
-        :param base_path:
-        :return:
-        """
-        note_list = []
+    # 保存结果到文件
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
 
-        for note_url in notes:
-            success, msg, note_info = self.spider_note(note_url, cookies_str, proxies)
-            if not success:
-                logger.error(f'爬取失败，停止继续爬取。失败原因: {msg}')
-                # 如果已经爬取到了一些数据，保存现有数据
-                if note_list:
-                    logger.info(f'保存已爬取的 {len(note_list)} 个笔记')
-                    for note_info in note_list:
-                        save_note_to_db(note_info)
-                return False, msg, note_list
+    print(f"✅ 分析完成！共分析 {count_analyzed} 张照片")
+    print(f"📄 结果已保存到: {output_file}")
 
-            if note_info is not None:
-                note_list.append(note_info)
-                save_note_to_db(note_info)
-                logger.info(f'成功爬取笔记: {note_info["note_id"]}')
+    return results
 
-        logger.info(f'成功爬取 {len(note_list)} 个笔记')
 
-        return True, "success", note_list
+def _analyze_single_photo(client: ImmichClient, asset_id: str) -> Optional[Dict]:
+    """
+    分析单张照片
+    """
+    try:
+        # 创建临时文件
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp_path = tmp.name
 
-    def spider_user_collect_note(self, user_url: str, cookies_str: str, proxies=None):
-        """
-        爬取一个用户的收藏笔记
-        :param user_url:
-        :param cookies_str:
-        :param base_path:
-        :return:
-        """
-        note_list = []
         try:
-            success, msg, all_note_info = self.xhs_apis.get_user_all_collect_note_info(user_url, cookies_str, proxies)
-            print(all_note_info)
-            if success:
-                logger.info(f'用户 {user_url} 作品数量: {len(all_note_info)}')
-                for simple_note_info in all_note_info:
-                    note_url = f"https://www.xiaohongshu.com/explore/{simple_note_info['note_id']}?xsec_token={simple_note_info['xsec_token']}"
-                    note_list.append(note_url)
-            self.spider_some_note(note_list, cookies_str)
-        except Exception as e:
-            success = False
-            msg = e
-        logger.info(f'爬取用户所有收藏视频 {user_url}: {success}, msg: {msg}')
-        return note_list, success, msg
+            # 下载缩略图进行分析
+            client.download_asset_thumbnail(asset_id, tmp_path)
 
-    def spider_user_favorite_note(self, user_url: str, cookies_str: str, proxies=None):
-        """
-        爬取一个用户的点赞笔记
-        :param user_url:
-        :param cookies_str:
-        :param base_path:
-        :return:
-        """
-        note_list = []
-        try:
-            success, msg, all_note_info = self.xhs_apis.get_user_all_like_note_info(user_url, cookies_str, proxies)
-            if success:
-                logger.info(f'用户 {user_url} 作品数量: {len(all_note_info)}')
-                for simple_note_info in all_note_info:
-                    note_url = f"https://www.xiaohongshu.com/explore/{simple_note_info['note_id']}?xsec_token={simple_note_info['xsec_token']}"
-                    note_list.append(note_url)
-            self.spider_some_note(note_list, cookies_str, proxies)
-        except Exception as e:
-            success = False
-            msg = e
-        logger.info(f'爬取用户所有视频 {user_url}: {success}, msg: {msg}')
-        return note_list, success, msg
+            # 调用你的 AI 分析函数
+            ai_summary, ai_tags = summarize_photo_file(tmp_path)
+
+            return {
+                'summary': ai_summary,
+                'tags': ai_tags
+            }
+
+        finally:
+            # 清理临时文件
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    except Exception as e:
+        print(f"[⚠️] 分析失败: {asset_id} - {e}")
+        return None
 
 
-if __name__ == '__main__':
+def main():
+    # 创建 Immich 客户端
+    client = ImmichClient(
+        base_url='http://localhost:2283',
+        api_key='cXoes49a109rpmEFDmxY4RG4ObY2aXBvVeDkhTHXE'  # 你的实际 API key
+    )
 
-    # data_spider = DataSpider()
-    #
-    # with open('/Users/yueyong/Dev/llm/Alfred/cookie_file.txt', 'r', encoding='utf-8') as f:
-    #     REDNOTE_COOKIES = f.read()
-    # user_url = 'https://www.xiaohongshu.com/user/profile/5c1313b60000000007003641'
-    # data_spider.spider_user_collect_note(user_url, REDNOTE_COOKIES)
-    download_note_media()
+    # 测试连接
+    try:
+        assets = client.get_all_assets(asset_type='IMAGE')
+        print(f"连接成功！找到 {len(assets)} 张图片")
+    except Exception as e:
+        print(f"连接失败: {e}")
+        return
+
+    # 分析所有照片
+    results = analyze_immich_photos(client, "immich_analysis.json")
+    
+
+if __name__ == "__main__":
+    main()

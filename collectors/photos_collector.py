@@ -14,9 +14,9 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from tqdm import tqdm
 
+from client.photoprism_client import Client
 from db.models import Photo  # 假设你已定义好 Photo 模型
 from summarizer.summarizer import summarize_photo_file
-from client.photoprism_api_client import Client
 
 pillow_heif.register_heif_opener()
 
@@ -271,25 +271,25 @@ def import_photo_from_photoprism(client: Client, session: Session):
     # 获取 Photoprism 中的照片列表
     photos = client.get_photos()
     print(f"✅ 获取 PhotoPrism 中的图片列表成功！共 {len(photos)} 张照片")
-    
+
     count_insert = 0
     count_update = 0
     count_analyzed = 0
-    
+
     for photo_data in tqdm(photos, desc="导入 Photoprism 照片", unit="photo"):
         # 构造文件路径（模拟）
         file_path = f"photoprism://{photo_data['UID']}"
-        
+
         # 查找是否已存在
         existing_photo = session.query(Photo).filter_by(file_path=file_path).first()
-        
+
         # 解析照片信息
         taken_at = datetime.fromisoformat(photo_data['TakenAt'].rstrip('Z'))
         camera_model = photo_data.get('CameraModel')
         gps_lat = photo_data.get('Lat')
         gps_lng = photo_data.get('Lng')
         caption = photo_data.get('Title', '') + ' ' + photo_data.get('Caption', '')
-        
+
         if existing_photo:
             # 更新现有记录
             existing_photo.caption = caption
@@ -314,32 +314,32 @@ def import_photo_from_photoprism(client: Client, session: Session):
             )
             session.add(photo)
             result = "insert"
-            
+
         if result == "insert":
             count_insert += 1
         elif result == "update":
             count_update += 1
-            
+
     session.commit()
     print(f"✅ Photoprism 照片导入完成，新增 {count_insert} 张照片，更新 {count_update} 张照片")
-    
+
     # 对新增或更新的照片进行AI分析
     photos_to_analyze = session.query(Photo).filter(
         Photo.file_path.like('photoprism://%'),
         or_(
-            Photo.ai_summary == None, 
-            Photo.ai_summary == "", 
-            Photo.ai_tags == None, 
+            Photo.ai_summary == None,
+            Photo.ai_summary == "",
+            Photo.ai_tags == None,
             Photo.ai_tags == []
         )
     ).all()
-    
+
     print(f"📷 需要分析的照片数量: {len(photos_to_analyze)}")
-    
+
     for photo in tqdm(photos_to_analyze, desc="分析 Photoprism 照片", unit="photo"):
         if _process_photoprism_photo_summary(photo, client, session):
             count_analyzed += 1
-            
+
     print(f"✅ Photoprism 照片分析完成，共分析 {count_analyzed} 张照片")
 
 
@@ -353,15 +353,15 @@ def _process_photoprism_photo_summary(photo, client, session):
     try:
         # 从 photoprism:// 协议中提取 UID
         photo_uid = photo.file_path.split('://')[1]
-        
+
         # 下载并分析照片
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             tmp_path = tmp.name
-            
+
         try:
             client.download_photo(photo_uid, tmp_path)
             ai_summary, ai_tags = summarize_photo_file(tmp_path)
-            
+
             photo.ai_summary = ai_summary
             photo.ai_tags = ai_tags
             photo.last_summarized_at = datetime.now()
@@ -369,7 +369,7 @@ def _process_photoprism_photo_summary(photo, client, session):
             return True
         finally:
             os.remove(tmp_path)
-            
+
     except Exception as e:
         print(f"[⚠️] Photoprism 图片分析失败: {photo.file_path} - {e}")
         return False

@@ -8,7 +8,7 @@ from tqdm import tqdm
 from collectors.blogs_collector import import_blogs_from_directory, summarize_blogs
 from collectors.notes_collector import import_notes_from_directory, summarize_notes
 from collectors.photos_collector import import_photo_from_directory, summarize_photos, import_photo_from_photoprism
-from client.photoprism_api_client import Client
+from client.photoprism_client import Client
 from server import config
 
 
