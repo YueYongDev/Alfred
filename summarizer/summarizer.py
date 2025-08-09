@@ -1,5 +1,4 @@
 import json
-import os
 import tempfile
 import time
 from typing import Tuple, List
@@ -69,7 +68,7 @@ def validate_and_prepare_image(file_path: str, max_size=(2048, 2048)) -> str:
         raise ValueError(f"图片处理失败: {file_path} → {e}")
 
 
-def resize_image(image_path: str, max_size=(1024, 1024)) -> str:
+def resize_image(image_path: str, max_size=(512, 512)) -> str:
     with Image.open(image_path) as im:
         im = im.convert("RGB")
         im.thumbnail(max_size)
@@ -91,7 +90,7 @@ def analyze_photo(image_path: str) -> dict:
     )
 
     try:
-        processed_path = resize_image(image_path, max_size=(1024, 1024))
+        processed_path = resize_image(image_path, max_size=(512, 512))
         messages = [
             ChatMessage(
                 role="user",
