@@ -246,22 +246,31 @@ def _process_regular_photo(file_path, photo, session):
     return True
 
 
-def summarize_photos(session: Session):
-    photos = session.query(Photo).filter(
-        or_(Photo.ai_summary == None, Photo.ai_summary == "", Photo.ai_tags == None, Photo.ai_tags == [])).all()
-    if not photos:
-        print("没有需要总结的 Photo")
-        return
+def summarize_photos(client: Client, session: Session):
+    count_analyzed = 0
+    # 对新增或更新的照片进行AI分析
+    photos_to_analyze = session.query(Photo).filter(
+        Photo.file_path.like('photoprism://%'),
+        or_(
+            Photo.ai_summary == None,
+            Photo.ai_summary == "",
+            Photo.ai_tags == None,
+            Photo.ai_tags == []
+        )
+    ).all()
 
-    count = 0
-    start_time = time.time()
+    print(f"📷 需要分析的照片数量: {len(photos_to_analyze)}")
 
-    for photo in tqdm(photos, desc="总结照片", unit="photo"):
-        if _process_single_photo_summary(photo, session):
-            count += 1
+    for index, photo in enumerate(tqdm(photos_to_analyze, desc="分析 Photoprism 照片", unit="photo")):
+        if _process_photoprism_photo_summary(photo, client, session):
+            count_analyzed += 1
 
-    elapsed = time.time() - start_time
-    print(f"✅ Photo 总结完成，共处理 {count} 条，用时 {elapsed:.2f} 秒")
+        # 每处理完15张照片就休息10秒
+        if (index + 1) % 10 == 0:
+            print(f"✅ sleep 10 seconds after processing {index + 1} photos")
+            time.sleep(15)
+
+    print(f"✅ Photoprism 照片分析完成，共分析 {count_analyzed} 张照片")
 
 
 def import_photo_from_photoprism(client: Client, session: Session):
@@ -274,7 +283,6 @@ def import_photo_from_photoprism(client: Client, session: Session):
 
     count_insert = 0
     count_update = 0
-    count_analyzed = 0
 
     for photo_data in tqdm(photos, desc="导入 Photoprism 照片", unit="photo"):
         # 构造文件路径（模拟）
@@ -322,30 +330,6 @@ def import_photo_from_photoprism(client: Client, session: Session):
 
     session.commit()
     print(f"✅ Photoprism 照片导入完成，新增 {count_insert} 张照片，更新 {count_update} 张照片")
-
-    # 对新增或更新的照片进行AI分析
-    photos_to_analyze = session.query(Photo).filter(
-        Photo.file_path.like('photoprism://%'),
-        or_(
-            Photo.ai_summary == None,
-            Photo.ai_summary == "",
-            Photo.ai_tags == None,
-            Photo.ai_tags == []
-        )
-    ).all()
-
-    print(f"📷 需要分析的照片数量: {len(photos_to_analyze)}")
-
-    for index, photo in enumerate(tqdm(photos_to_analyze, desc="分析 Photoprism 照片", unit="photo")):
-        if _process_photoprism_photo_summary(photo, client, session):
-            count_analyzed += 1
-        
-        # 每处理完15张照片就休息10秒
-        if (index + 1) % 10 == 0:
-            print(f"✅ sleep 10 seconds after processing {index + 1} photos")
-            time.sleep(15)
-
-    print(f"✅ Photoprism 照片分析完成，共分析 {count_analyzed} 张照片")
 
 
 def _process_photoprism_photo_summary(photo, client, session):

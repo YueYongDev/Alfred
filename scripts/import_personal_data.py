@@ -40,10 +40,10 @@ def main():
         # ("📥 正在导入笔记 ...", lambda: import_notes_from_directory(NOTES_DIR, session)),
         # ("📥 正在导入博客 ...", lambda: import_blogs_from_directory(BLOGS_DIR, session)),
         # ("📷 正在导入照片 EXIF 信息 ...", lambda: import_photo_from_directory(PHOTOS_DIR, session)),
-        ("📸 正在从 Photoprism 导入照片 ...", lambda: import_photo_from_photoprism(photoprism_client, session)),
+        # ("📸 正在从 Photoprism 导入照片 ...", lambda: import_photo_from_photoprism(photoprism_client, session)),
         # ("📝 正在总结博客 ...", lambda: summarize_blogs(session)),
         # ("📝 正在总结笔记 ...", lambda: summarize_notes(session)),
-        # ("📝 正在总结照片 ...", lambda: summarize_photos(session)),
+        ("📝 正在总结照片 ...", lambda: summarize_photos(photoprism_client,session)),
     ]
     for desc, func in steps:
         tqdm.write(desc)
