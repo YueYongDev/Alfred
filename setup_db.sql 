@@ -81,6 +81,7 @@ CREATE TABLE daily_hot (
     collected_at TIMESTAMP,
     ai_tags TEXT[],
     ai_summary TEXT,
+    extra JSON,
     last_summarized_at TIMESTAMP,
     last_embedded_at TIMESTAMP
 );
