@@ -10,10 +10,11 @@ from db.database import SessionLocal
 from db.models import DailyHot
 
 
+# 修改后的 save_hot_item_to_db 函数
 def save_hot_item_to_db(category: str, item: Dict[str, Any]) -> bool:
     """
     将单个热点数据保存到数据库
-    
+
     :param category: 热点分类
     :param item: 热点数据项
     :return: 是否保存成功
@@ -29,12 +30,19 @@ def save_hot_item_to_db(category: str, item: Dict[str, Any]) -> bool:
         # 处理时间戳
         publish_time = None
         if 'timestamp' in item and item['timestamp']:
-            # 处理毫秒时间戳
-            timestamp = int(item['timestamp'])
-            if timestamp > 1000000000000:  # 毫秒时间戳
-                publish_time = datetime.fromtimestamp(timestamp / 1000)
-            else:  # 秒时间戳
-                publish_time = datetime.fromtimestamp(timestamp)
+            try:
+                # 处理毫秒时间戳
+                timestamp = int(item['timestamp'])
+                # 检查时间戳是否合理 (1970-01-01 到 2100-12-31)
+                if 0 <= timestamp <= 4102444800000:  # 2100年底的毫秒时间戳
+                    if timestamp > 1000000000000:  # 毫秒时间戳
+                        publish_time = datetime.fromtimestamp(timestamp / 1000)
+                    else:  # 秒时间戳
+                        publish_time = datetime.fromtimestamp(timestamp)
+                else:
+                    logger.warning(f"时间戳超出合理范围，将忽略: {timestamp}")
+            except (ValueError, OSError, OverflowError) as e:
+                logger.warning(f"时间戳转换失败，将忽略时间信息: {item.get('timestamp')}, 错误: {e}")
 
         if existing_item:
             # 更新现有记录
@@ -150,9 +158,9 @@ def main():
     """
     主函数，用于执行热点数据收集和分析
     """
-    # logger.info("开始收集热点数据...")
-    # collect_daily_hot_data()
-    # logger.info("热点数据收集完成")
+    logger.info("开始收集热点数据...")
+    collect_daily_hot_data()
+    logger.info("热点数据收集完成")
 
     logger.info("开始分析热点数据...")
     analyze_daily_hot_data()
