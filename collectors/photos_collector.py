@@ -265,10 +265,10 @@ def summarize_photos(client: Client, session: Session):
         if _process_photoprism_photo_summary(photo, client, session):
             count_analyzed += 1
 
-        # 每处理完15张照片就休息10秒
-        if (index + 1) % 10 == 0:
-            print(f"✅ sleep 10 seconds after processing {index + 1} photos")
-            time.sleep(15)
+        # 每处理完15张照片就休息5秒
+        if (index + 1) % 15 == 0:
+            print(f"✅ sleep 5 seconds after processing {index + 1} photos")
+            time.sleep(10)
 
     print(f"✅ Photoprism 照片分析完成，共分析 {count_analyzed} 张照片")
 
