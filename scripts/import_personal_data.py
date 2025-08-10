@@ -28,7 +28,7 @@ def main():
     # === Photoprism 客户端配置 ===
     PHOTO_PRISM_USERNAME = os.getenv("PHOTO_PRISM_USERNAME", "yueyong")
     PHOTO_PRISM_PASSWORD = os.getenv("PHOTO_PRISM_PASSWORD", "Liang19991108@")
-    PHOTO_PRISM_DOMAIN = os.getenv("PHOTO_PRISM_DOMAIN", "http://dx4800-25d3.local:2342")
+    PHOTO_PRISM_DOMAIN = os.getenv("PHOTO_PRISM_DOMAIN", "https://photoprism.yueyong.fun")
     
     photoprism_client = Client(
         username=PHOTO_PRISM_USERNAME,

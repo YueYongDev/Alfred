@@ -137,7 +137,7 @@ def summarize_photo_file(image_path: str) -> Tuple[str, List[str]]:
 
 
 if __name__ == '__main__':
-    image_path = "/Volumes/personal_folder/Photos/2025/03/23/104033.JPG"
+    image_path = "/Users/yueyong/Downloads/25d0fd23ecf355aaf797297319d76a482c09a81eceb6bcc4b23c5f586d6a1e36.jpg"
     file_path = "/Users/yueyong/alfred_test_data/blogs/技术科普/浅谈策略模式在消息转发场景下的应用.md"
 
     start_time = time.time()

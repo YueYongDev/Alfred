@@ -5,6 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/alfred")
+
 # —— LLM & Embedding ——
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL","127.0.0.1:11434")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "ollama")

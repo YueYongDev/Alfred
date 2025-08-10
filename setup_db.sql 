@@ -68,6 +68,24 @@ CREATE TABLE rednote (
     last_embedded_at TIMESTAMP
 );
 
+CREATE TABLE daily_hot (
+    id SERIAL PRIMARY KEY,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    cover TEXT,
+    hot_score INTEGER,
+    url TEXT,
+    mobile_url TEXT,
+    publish_time TIMESTAMP,
+    collected_at TIMESTAMP,
+    ai_tags TEXT[],
+    ai_summary TEXT,
+    last_summarized_at TIMESTAMP,
+    last_embedded_at TIMESTAMP
+);
+
+
 
 -- 先安装 pgvector 扩展（只需一次）：
 CREATE EXTENSION IF NOT EXISTS vector;
