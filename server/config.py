@@ -8,6 +8,9 @@ load_dotenv()
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/alfred")
 
 # —— LLM & Embedding ——
+OLLAMA_INSTANCE_0 = os.getenv("OLLAMA_INSTANCE_0","127.0.0.1:11434")
+OLLAMA_INSTANCE_1 = os.getenv("OLLAMA_INSTANCE_1","127.0.0.1:11435")
+
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL","127.0.0.1:11434")
 OLLAMA_BASE_MODEL = os.getenv("OLLAMA_BASE_MODEL", "gemma3:4b")
 
