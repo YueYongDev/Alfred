@@ -15,8 +15,8 @@ def get_llm():
 
 def get_summarize_llm():
     return Ollama(
-        base_url=config.OLLAMA_SUMMARIZE_URL,
-        model=config.OLLAMA_SUMMARIZE_MODEL,
+        base_url=config.OPENAI_TEXT_BASE_URL,
+        model=config.SUMMARIZE_MODEL,
         request_timeout=6000,
         json_mode=True,
         thinking=False

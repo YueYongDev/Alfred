@@ -9,6 +9,7 @@ SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@loca
 
 # —— LLM & Embedding ——
 OLLAMA_INSTANCE_0 = os.getenv("OLLAMA_INSTANCE_0","127.0.0.1:11434")
+OPENAI_TEXT_BASE_URL = os.getenv("OPENAI_TEXT_BASE_URL","127.0.0.1:11435")
 OLLAMA_INSTANCE_1 = os.getenv("OLLAMA_INSTANCE_1","127.0.0.1:11435")
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL","127.0.0.1:11434")

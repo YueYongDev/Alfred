@@ -138,16 +138,16 @@ def summarize_photo_file(image_path: str) -> Tuple[str, List[str]]:
 
 if __name__ == '__main__':
     image_path = "/Users/yueyong/Downloads/25d0fd23ecf355aaf797297319d76a482c09a81eceb6bcc4b23c5f586d6a1e36.jpg"
-    file_path = "/Users/yueyong/alfred_test_data/blogs/技术科普/浅谈策略模式在消息转发场景下的应用.md"
+    file_path = "/Users/yueyong/alfred_test_data/blogs/技术科普/你看那个区块链，像不像我借你的二百元.md"
 
     start_time = time.time()
     image_summary, image_tags = summarize_photo_file(image_path)
     elapsed = time.time() - start_time
     print(f"took {elapsed:.2f} seconds")
-    # file_summary, file_tags = summarize_text_file(file_path)
+    file_summary, file_tags = summarize_text_file(file_path)
 
     print(f"Image Summary: {image_summary}")
     print(f"Image Tags: {image_tags}")
 
-    # print(f"File Summary: {file_summary}")
-    # print(f"File Tags: {file_tags}")
+    print(f"File Summary: {file_summary}")
+    print(f"File Tags: {file_tags}")
