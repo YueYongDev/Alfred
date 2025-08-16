@@ -6,8 +6,8 @@ from server import config
 
 def get_llm():
     return Ollama(
-        base_url=config.OPENAI_BASE_URL,
-        model=config.BASE_MODEL,
+        base_url=config.OLLAMA_BASE_URL,
+        model=config.OLLAMA_BASE_MODEL,
         request_timeout=6000,
         tools=False,
     )
@@ -15,8 +15,8 @@ def get_llm():
 
 def get_summarize_llm():
     return Ollama(
-        base_url=config.OPENAI_BASE_URL,
-        model=config.SUMMARIZE_MODEL,
+        base_url=config.OLLAMA_SUMMARIZE_URL,
+        model=config.OLLAMA_SUMMARIZE_MODEL,
         request_timeout=6000,
         json_mode=True,
         thinking=False
@@ -25,16 +25,16 @@ def get_summarize_llm():
 
 def get_embed_model():
     return OllamaEmbedding(
-        base_url=config.OPENAI_BASE_URL,
-        model_name=config.EMBEDDING_MODEL,
+        base_url=config.OLLAMA_EMBEDDING_URL,
+        model_name=config.OLLAMA_EMBEDDING_MODEL,
         request_timeout=6000,
     )
 
 
 def get_vision_llm():
     return Ollama(
-        base_url=config.OPENAI_BASE_URL,
-        model=config.VISION_LLM_MODEL,
+        base_url=config.OLLAMA_VISION_URL,
+        model=config.OLLAMA_VISION_MODEL,
         request_timeout=6000,
         json_mode=True
     )

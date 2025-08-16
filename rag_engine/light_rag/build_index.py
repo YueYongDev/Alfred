@@ -22,9 +22,9 @@ async def initialize_rag():
     rag = LightRAG(
         working_dir=WORKING_DIR,
         llm_model_func=ollama_model_complete,  # 使用Ollama模型进行文本生成
-        llm_model_name=config.BASE_MODEL,  # 您的模型名称
+        llm_model_name=config.OLLAMA_BASE_MODEL,  # 您的模型名称
         llm_model_kwargs={
-            "host": config.OPENAI_BASE_URL,
+            "host": config.OLLAMA_BASE_URL,
             "options": {"num_ctx": 8192},
             "timeout": int(os.getenv("TIMEOUT", "6000")),
         },
@@ -34,8 +34,8 @@ async def initialize_rag():
             max_token_size=8192,
             func=lambda texts: ollama_embed(
                 texts,
-                embed_model=config.EMBEDDING_MODEL,
-                host=config.OPENAI_BASE_URL,
+                embed_model=config.OLLAMA_EMBEDDING_MODEL,
+                host=config.OLLAMA_EMBEDDING_URL,
                 timeout=6000
             )
         ),
@@ -56,20 +56,20 @@ async def build_index():
     rag = await initialize_rag()
 
     # Note
-    notes = session.query(Note).all()
-    print(f"⏰ 开始针对 Notes 做RAG")
-    for note in tqdm(notes, desc="Notes"):
-        text = format_note(note)
-        await rag.ainsert(text, file_paths=getattr(note, 'file_path', None))
-    print(f"✅ Notes 总结完成")
-
-    # Blog
-    blogs = session.query(Blog).all()
-    print(f"⏰ 开始针对 Blogs 做RAG")
-    for blog in tqdm(blogs, desc="Blogs"):
-        text = format_blog(blog)
-        await rag.ainsert(text, file_paths=getattr(blog, 'file_path', None))
-    print(f"✅ Blogs 总结完成")
+    # notes = session.query(Note).all()
+    # print(f"⏰ 开始针对 Notes 做RAG")
+    # for note in tqdm(notes, desc="Notes"):
+    #     text = format_note(note)
+    #     await rag.ainsert(text, file_paths=getattr(note, 'file_path', None))
+    # print(f"✅ Notes 总结完成")
+    #
+    # # Blog
+    # blogs = session.query(Blog).all()
+    # print(f"⏰ 开始针对 Blogs 做RAG")
+    # for blog in tqdm(blogs, desc="Blogs"):
+    #     text = format_blog(blog)
+    #     await rag.ainsert(text, file_paths=getattr(blog, 'file_path', None))
+    # print(f"✅ Blogs 总结完成")
 
     # Photo
     photos = session.query(Photo).all()

@@ -51,7 +51,7 @@ def answer_question_sync(question, top_k=8):
 def answer_question_stream(question, top_k=8):
     import json
     import requests
-    from server.config import OPENAI_BASE_URL, BASE_MODEL
+    from server.config import OLLAMA_BASE_URL, BASE_MODEL
 
     docs = search_vector_db(question, top_k=top_k)
     context = "\n---\n".join([doc['text'] for doc in docs])
@@ -65,9 +65,9 @@ def answer_question_stream(question, top_k=8):
 
     s = requests.Session()
     with s.post(
-        f"{OPENAI_BASE_URL}/v1/chat/completions",
+        f"{OLLAMA_BASE_URL}/v1/chat/completions",
         json={
-            "model": BASE_MODEL,
+            "model": OLLAMA_BASE_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "stream": True,
         },

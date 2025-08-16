@@ -8,13 +8,17 @@ load_dotenv()
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@localhost:5432/alfred")
 
 # —— LLM & Embedding ——
-OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL","127.0.0.1:11434")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "ollama")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL","127.0.0.1:11434")
+OLLAMA_BASE_MODEL = os.getenv("OLLAMA_BASE_MODEL", "gemma3:4b")
 
-SUMMARIZE_MODEL = os.getenv("SUMMARIZE_MODEL", "gemma3:4b")
-BASE_MODEL = os.getenv("BASE_MODEL", "gemma3:4b")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "bge-m3:latest")
-VISION_LLM_MODEL = os.getenv("VISION_LLM_MODEL", "gemma3:4b")
+OLLAMA_EMBEDDING_URL = os.getenv("OLLAMA_EMBEDDING_URL", "bge-m3:latest")
+OLLAMA_EMBEDDING_MODEL = os.getenv("OLLAMA_EMBEDDING_MODEL", "bge-m3:latest")
+
+OLLAMA_SUMMARIZE_URL = OLLAMA_BASE_URL
+OLLAMA_SUMMARIZE_MODEL = os.getenv("OLLAMA_SUMMARIZE_MODEL", "gemma3:4b")
+
+OLLAMA_VISION_URL = OLLAMA_BASE_URL
+OLLAMA_VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "gemma3:4b")
 
 # —— 数据路径（Path 对象方便做 / 拼接，但后续传第三方库时记得 str(...)） ——
 NOTES_DIR = os.getenv("NOTES_DIR", "/Users/yueyong/alfred_test_data/notes")

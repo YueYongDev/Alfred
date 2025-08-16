@@ -9,6 +9,7 @@ from collectors.blogs_collector import import_blogs_from_directory, summarize_bl
 from collectors.notes_collector import import_notes_from_directory, summarize_notes
 from collectors.photos_collector import import_photo_from_directory, summarize_photos, import_photo_from_photoprism
 from client.photoprism_client import Client
+from db.database import SessionLocal
 from server import config
 
 
@@ -20,10 +21,7 @@ def main():
     PHOTOS_DIR = config.PHOTOS_DIR
 
     # === 数据库连接配置 ===
-    DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://root:root@192.168.100.197:5432/alfred")
-    engine = create_engine(DATABASE_URL)
-    Session = sessionmaker(bind=engine)
-    session = Session()
+    session = SessionLocal()
 
     # === Photoprism 客户端配置 ===
     PHOTO_PRISM_USERNAME = os.getenv("PHOTO_PRISM_USERNAME", "yueyong")

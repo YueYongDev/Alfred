@@ -24,7 +24,7 @@ __pycache__/
 *.tmp
 *.orig
 *.pid
-.env.local
+.env
 *.env.development
 *.env.production
 *.env.test

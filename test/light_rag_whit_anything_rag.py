@@ -26,9 +26,9 @@ async def load_existing_lightrag():
     lightrag_instance = LightRAG(
         working_dir=lightrag_working_dir,
         llm_model_func=ollama_model_complete,  # 使用Ollama模型进行文本生成
-        llm_model_name=config.BASE_MODEL,  # 您的模型名称
+        llm_model_name=config.OLLAMA_BASE_MODEL,  # 您的模型名称
         llm_model_kwargs={
-            "host": config.OPENAI_BASE_URL,
+            "host": config.OLLAMA_BASE_URL,
             "options": {"num_ctx": 8192},
             "timeout": int(os.getenv("TIMEOUT", "300")),
         },
@@ -38,8 +38,8 @@ async def load_existing_lightrag():
             max_token_size=8192,
             func=lambda texts: ollama_embed(
                 texts,
-                embed_model=config.EMBEDDING_MODEL,
-                host=config.OPENAI_BASE_URL,
+                embed_model=config.OLLAMA_EMBEDDING_MODEL,
+                host=config.OLLAMA_EMBEDDING_URL,
             )
         ),
         kv_storage="PGKVStorage",
@@ -57,7 +57,7 @@ async def load_existing_lightrag():
         # 仅需要视觉模型用于多模态处理
         vision_model_func=lambda prompt, system_prompt=None, history_messages=[], image_data=None,
                                  **kwargs: _ollama_model_if_cache(
-            config.BASE_MODEL,
+            config.OLLAMA_BASE_MODEL,
             "",
             system_prompt=None,
             history_messages=[],
@@ -71,7 +71,7 @@ async def load_existing_lightrag():
             api_key="your-api-key",
             **kwargs,
         ) if image_data else _ollama_model_if_cache(
-            config.VISION_LLM_MODEL,
+            config.OLLAMA_VISION_MODEL,
             prompt,
             system_prompt=system_prompt,
             history_messages=history_messages,
