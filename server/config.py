@@ -30,6 +30,12 @@ BLOGS_DIR = os.getenv("BLOGS_DIR", "/Users/yueyong/alfred_test_data/blogs")
 PHOTOS_DIR = os.getenv("PHOTOS_DIR", "/Users/yueyong/alfred_test_data/photos")
 REDNOTE_DIR= os.getenv("REDNOTE_DIR", "/Users/yueyong/alfred_test_data/rednotes")
 
+# —— External services ——
+PHOTO_PRISM_USERNAME = os.getenv("PHOTO_PRISM_USERNAME", "yueyong")
+PHOTO_PRISM_PASSWORD = os.getenv("PHOTO_PRISM_PASSWORD", "changeme")
+PHOTO_PRISM_DOMAIN = os.getenv("PHOTO_PRISM_DOMAIN", "https://photoprism.yueyong.fun")
+DAILY_HOT_API_BASE = os.getenv("DAILY_HOT_API_BASE", "http://localhost:6688")
+
 # —— Chunk —— 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", 512))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", 64))

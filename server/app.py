@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse, JSONResponse
-from rag_engine.vector_rag.query_engine import answer_question_stream, answer_question_sync
 import json
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, StreamingResponse
+
+from agents.runtime import run_agent, stream_agent
 from server import config
 
 app = FastAPI()
@@ -41,27 +42,28 @@ async def chat_completions(request: Request):
 
     if stream:
         def event_generator():
-            for delta in answer_question_stream(question):
-                # 这里 delta 已经是纯文本片段
+            for delta in stream_agent(messages):
+                if not delta:
+                    continue
                 yield format_openai_stream_delta(delta)
             yield "data: [DONE]\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
-    else:
-        answer = answer_question_sync(question)
-        return JSONResponse({
-            "id": "chatcmpl-xxxx",
-            "object": "chat.completion",
-            "created": 1234567890,
-            "model": "local-llm-model",
-            "choices": [
-                {
-                    "message": {"role": "assistant", "content": answer},
-                    "finish_reason": "stop",
-                    "index": 0,
-                }
-            ],
-        })
+
+    answer = run_agent(messages)
+    return JSONResponse({
+        "id": "chatcmpl-xxxx",
+        "object": "chat.completion",
+        "created": 1234567890,
+        "model": config.BASE_MODEL,
+        "choices": [
+            {
+                "message": {"role": "assistant", "content": answer},
+                "finish_reason": "stop",
+                "index": 0,
+            }
+        ],
+    })
 
 
 if __name__ == "__main__":
