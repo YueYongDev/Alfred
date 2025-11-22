@@ -6,13 +6,13 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
-from qwen_agent.tools import BaseTool
 from qwen_agent.tools.base import register_tool
+from tools.base import QwenAgentBaseTool
 
 DEFAULT_TZ = "Asia/Shanghai"
 
 @register_tool("current_time")
-class CurrentTimeTool(BaseTool):
+class CurrentTimeTool(QwenAgentBaseTool):
     description = "获取当前时间，支持指定时区，返回 ISO8601 与格式化时间。"
     parameters = {
         "type": "object",
@@ -25,7 +25,7 @@ class CurrentTimeTool(BaseTool):
         "required": [],
     }
 
-    def call(self, params: Dict[str, Any], **_: Any) -> str:
+    def _execute_tool(self, params: Dict[str, Any], **_: Any) -> str:
         args = self._verify_json_format_args(params or {})
         tz_name = args.get("timezone") or DEFAULT_TZ
         now_iso, now_human = _now_in_tz(tz_name)

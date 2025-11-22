@@ -1,11 +1,13 @@
 from qwen_agent.agents import Assistant
+from qwen_agent.tools import ImageZoomInToolQwen3VL
 
 from server import config
+from tools.image_gen import MyImageGen
 
-VISION_PROMPT = "你是视觉理解 Agent，负责分析用户提供的图片并回答与视觉内容相关的问题。"
+VISION_PROMPT = "你是图像创建Agent，可以根据要求实现文生图，或者根据已有图片进行图生图或者图片修改。"
 
 
-def vision_assistant() -> Assistant:
+def image_gen_assistant() -> Assistant:
     vl_llm_cfg = {
         "model": config.LLM_VL_MODEL,
         "model_server": config.LLM_BASE_URL,
@@ -16,10 +18,15 @@ def vision_assistant() -> Assistant:
         },
     }
 
+    tool_instances = [
+        MyImageGen(),
+        ImageZoomInToolQwen3VL(),
+    ]
+
     return Assistant(
-        function_list=None,
+        function_list=tool_instances,
         llm=vl_llm_cfg,
         system_message=VISION_PROMPT,
-        name="vision",
-        description="视觉理解助手，可处理包含图片的多模态提问。",
+        name="image_gen_assistant",
+        description="图像创建Agent，可以根据要求实现文生图，或者根据已有图片进行图生图或者图片修改。",
     )

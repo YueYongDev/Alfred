@@ -4,15 +4,16 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from qwen_agent.tools import BaseTool
+from qwen_agent.tools.base import register_tool
+from tools.base import QwenAgentBaseTool
 
 from tools.common import dump, safe_get_json
 
 GEOCODE_API = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_API = "https://api.open-meteo.com/v1/forecast"
 
-class WeatherTool(BaseTool):
-    name = "weather"
+@register_tool("weather")
+class WeatherTool(QwenAgentBaseTool):
     description = "查询城市当前天气与预报（使用 open-meteo 公共接口）。"
     parameters = {
         "type": "object",
@@ -25,7 +26,7 @@ class WeatherTool(BaseTool):
         "required": ["city"],
     }
 
-    def call(self, params: Dict[str, Any], **_: Any) -> str:
+    def _execute_tool(self, params: Dict[str, Any], **_: Any) -> str:
         args = self._verify_json_format_args(params)
         city = args["city"]
         geo = _geocode_city(city)

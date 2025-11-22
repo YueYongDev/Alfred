@@ -9,6 +9,7 @@ load_dotenv()
 # 统一用 openai 格式，既可指向本地/远程 Ollama，也可指向 OpenAI/其他兼容服务。
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen3:latest")
 LLM_VL_MODEL = os.getenv("LLM_VL_MODEL", "qwen3-vl:4b")
+LLM_CODE_MODEL = os.getenv("LLM_CODE_MODEL", "qwen3-coder-plus")
 LLM_ROUTE_MODEL = os.getenv("LLM_ROUTE_MODEL", "qwen3:1.7b")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://127.0.0.1:11434/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "ollama")  # Ollama 兼容接口可用任意非空值

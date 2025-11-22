@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Iterator, List
 
-import logging
-from qwen_agent.agents import Assistant, Router
+from qwen_agent.agents import Router
+from qwen_agent.tools import WebSearch, CodeInterpreter
 
+from agents.code_agent import code_assistant
+from agents.image_gen_agent import image_gen_assistant
 from agents.vl_agent import vision_assistant
 from server import config
-from tools import DailyHotTrendsTool, ForexRateTool, CurrentTimeTool, WeatherTool
+from tools.daily_hot import DailyHotTrendsTool
+from tools.forex import ForexRateTool
+from tools.hot_article import WebSummaryTool
+from tools.time_tools import CurrentTimeTool
+from tools.weather import WeatherTool
 
 logger = logging.getLogger("server.app")
 if not logger.handlers:
@@ -21,13 +28,34 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_agent() -> Router:
+def build_main_chat_agent() -> Router:
     """Build a router agent that dispatches between text and vision assistants."""
+    route_llm_cfg = {
+        "model": config.LLM_MODEL,
+        "model_server": config.LLM_BASE_URL,
+        "api_key": config.LLM_API_KEY,
+        "generate_cfg": {
+            "temperature": config.LLM_TEMPERATURE,
+        },
+    }
+
+    tool_instances = [
+        WeatherTool(),
+        DailyHotTrendsTool(),
+        WebSummaryTool(),
+        ForexRateTool(),
+        CurrentTimeTool(),
+        WebSearch(),
+        CodeInterpreter()
+    ]
+
     router = Router(
-        llm=_build_llm_cfg(),
+        llm=route_llm_cfg,
+        function_list=tool_instances,
         agents=[
             vision_assistant(),
-            _build_general_assistant(),
+            image_gen_assistant(),
+            code_assistant()
         ],
         name="router",
         description="负责在通用对话与视觉理解助手之间路由。",
@@ -35,11 +63,11 @@ def build_agent() -> Router:
     return router
 
 
-def run_agent(messages: List[Dict]) -> str:
+def run_main_chat(messages: List[Dict]) -> str:
     """Run the orchestrator in non-streaming mode and return the final content string."""
-    agent = build_agent()
+    main_chat_agent = build_main_chat_agent()
     normalized = _normalize_messages(messages)
-    responses = agent.run_nonstream(normalized)
+    responses = main_chat_agent.run_nonstream(normalized)
     if not responses:
         return ""
     latest = _get_content(responses[-1])
@@ -48,9 +76,9 @@ def run_agent(messages: List[Dict]) -> str:
 
 def stream_agent(messages: List[Dict]) -> Iterator[str]:
     """Stream textual deltas from the orchestrator."""
-    agent = build_agent()
+    agent = build_main_chat_agent()
     normalized = _normalize_messages(messages)
-    logger.debug("_normalize_messages: %s", normalized)
+    # logger.info("_normalize_messages: %s", normalized)
     buffer = ""
     for chunk in agent.run(normalized):
         if not chunk:
@@ -65,52 +93,48 @@ def stream_agent(messages: List[Dict]) -> Iterator[str]:
             yield delta
 
 
-def _build_llm_cfg() -> Dict:
-    return {
-        "model": config.LLM_MODEL,
-        "model_server": config.LLM_BASE_URL,
-        "api_key": config.LLM_API_KEY,
-        "generate_cfg": {
-            "temperature": config.LLM_TEMPERATURE,
-        },
-    }
-
-
-def _build_general_assistant() -> Assistant:
-    # tools = default_tools()
-    tool_instances = [
-        DailyHotTrendsTool(),
-        ForexRateTool(),
-        CurrentTimeTool(),
-        WeatherTool(),
-    ]
-    general_llm_cfg = {
-        "model": config.LLM_MODEL,
-        "model_server": config.LLM_BASE_URL,
-        "api_key": config.LLM_API_KEY,
-        "generate_cfg": {
-            "temperature": config.LLM_TEMPERATURE,
-        },
-    }
-    return Assistant(
-        function_list=tool_instances,
-        llm=general_llm_cfg,
-        system_message=SYSTEM_PROMPT,
-        name="general",
-        description="通用助手，负责文本对话与工具调用。",
-    )
-
-
-
-
-
 def _normalize_messages(messages: List[Dict]) -> List[Dict]:
     """Convert OpenAI-style multimodal messages to qwen-agent schema."""
     normalized = []
     for msg in messages:
+        parts = []
+
+        def _extract_image_url(obj) -> str | None:
+            url = None
+            if isinstance(obj, str):
+                url = obj
+            elif isinstance(obj, dict):
+                info = obj.get("image_url") or obj.get("image") or obj
+                if isinstance(info, dict):
+                    url = (
+                            info.get("url")
+                            or info.get("data")
+                            or info.get("base64")
+                            or info.get("content")
+                            or info.get("path")
+                    )
+                elif isinstance(info, str):
+                    url = info
+            return url
+
+        def _extract_file_val(obj) -> str | None:
+            if isinstance(obj, str):
+                return obj
+            if isinstance(obj, dict):
+                info = obj.get("file") or obj.get("input_file") or obj
+                if isinstance(info, dict):
+                    return (
+                            info.get("url")
+                            or info.get("path")
+                            or info.get("data")
+                            or info.get("content")
+                    )
+                if isinstance(info, str):
+                    return info
+            return None
+
         content = msg.get("content")
         if isinstance(content, list):
-            parts = []
             for part in content:
                 if not isinstance(part, dict):
                     continue
@@ -118,28 +142,11 @@ def _normalize_messages(messages: List[Dict]) -> List[Dict]:
                 if p_type == "text":
                     parts.append({"text": part.get("text", "")})
                 elif p_type in ("image_url", "image"):
-                    url = None
-                    image_info = part.get("image_url") or {}
-                    if isinstance(image_info, dict):
-                        url = image_info.get("url")
-                    elif isinstance(image_info, str):
-                        url = image_info
-                    if not url and isinstance(part.get("image"), str):
-                        url = part.get("image")
+                    url = _extract_image_url(part)
                     if url:
                         parts.append({"image": url})
                 elif p_type in ("file", "input_file"):
-                    file_val = None
-                    file_info = part.get("file") or part.get("input_file")
-                    if isinstance(file_info, dict):
-                        file_val = (
-                                file_info.get("url")
-                                or file_info.get("path")
-                                or file_info.get("data")
-                                or file_info.get("content")
-                        )
-                    elif isinstance(file_info, str):
-                        file_val = file_info
+                    file_val = _extract_file_val(part)
                     if file_val:
                         parts.append({"file": file_val})
                 else:
@@ -148,8 +155,24 @@ def _normalize_messages(messages: List[Dict]) -> List[Dict]:
                         if isinstance(part.get(key), str):
                             parts.append({key: part[key]})
                             break
-            msg = {**msg, "content": parts}
-        normalized.append(msg)
+        elif isinstance(content, str):
+            if content:
+                parts.append({"text": content})
+
+        # message-level images/files (e.g., {"content": "xxx", "images": [...]})
+        for image in msg.get("images") or []:
+            url = _extract_image_url(image)
+            if url:
+                parts.append({"image": url})
+        for file_item in msg.get("files") or []:
+            val = _extract_file_val(file_item)
+            if val:
+                parts.append({"file": val})
+
+        # Create new message without the original images/files fields to avoid double processing
+        new_msg = {k: v for k, v in msg.items() if k not in ("images", "files")}
+        new_msg["content"] = parts
+        normalized.append(new_msg)
     return normalized
 
 

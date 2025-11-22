@@ -13,7 +13,7 @@ from tools.common import dump, normalize_base, safe_post_json
 SUMMARY_API = normalize_base(config.WEB_SUMMARY_API)
 
 
-def analyze_hot_item(url: str) -> Dict[str, Any]:
+def website_summary(url: str) -> Dict[str, Any]:
     """Call the summary service to analyze a single URL."""
     if not url:
         return {"task": "daily_hot_article", "status": "error", "error": "URL 不能为空"}
@@ -50,7 +50,7 @@ class WebSummaryTool(QwenAgentBaseTool):
         if not url:
             return dump({"task": "daily_hot_article", "status": "error", "error": "URL 不能为空"})
 
-        result = analyze_hot_item(url)
+        result = website_summary(url)
         if result.get("status") == "error":
             return dump(result)
 
