@@ -3,10 +3,12 @@ from qwen_agent.tools import WebSearch
 
 from server import config
 from tools.duckduckgo_search import DuckDuckGoSearch
+from tools.google_web_search import GoogleWebSearch
 
 WEB_SEARCH_PROMPT = (
     "你是网络搜索 Agent，擅长使用多种搜索引擎（如 Google、DuckDuckGo）"
     "快速检索并汇总最新的公开信息，优先调用 DuckDuckGo 以降低费用。"
+    "最终回答时只输出总结，不要把工具调用的原始 JSON 或日志返回给用户。"
 )
 
 
@@ -22,7 +24,7 @@ def web_search_assistant() -> Assistant:
 
     tool_instances = [
         DuckDuckGoSearch(),
-        WebSearch(),
+        GoogleWebSearch(),
     ]
 
     return Assistant(

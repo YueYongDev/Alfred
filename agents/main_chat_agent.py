@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Dict, Iterator, List
 
 from qwen_agent.agents import Router
@@ -10,7 +11,9 @@ from qwen_agent.tools import WebSearch, CodeInterpreter
 
 from agents.code_agent import code_assistant
 from agents.image_gen_agent import image_gen_assistant
+from agents.qwen_agent_router import QwenAgentRouter
 from agents.vl_agent import vision_assistant
+from agents.web_search_agent import web_search_assistant
 from server import config
 from tools.daily_hot import DailyHotTrendsTool
 from tools.forex import ForexRateTool
@@ -25,13 +28,14 @@ if not logger.handlers:
 SYSTEM_PROMPT = (
     "你是 Alfred 的总协调 Agent，需要综合个人知识库、日常数据源以及各种工具来回答问题。"
     "在作答前应先判断是否需要调用可用工具。"
+    "生成最终回复时，不要展示任何工具调用日志、JSON 原始结果或 Call 标记，只输出整理后的答案。"
 )
 
 
 def build_main_chat_agent() -> Router:
     """Build a router agent that dispatches between text and vision assistants."""
     route_llm_cfg = {
-        "model": config.LLM_MODEL,
+        "model": config.LLM_ROUTE_MODEL,
         "model_server": config.LLM_BASE_URL,
         "api_key": config.LLM_API_KEY,
         "generate_cfg": {
@@ -45,18 +49,13 @@ def build_main_chat_agent() -> Router:
         WebSummaryTool(),
         ForexRateTool(),
         CurrentTimeTool(),
-        WebSearch(),
         CodeInterpreter()
     ]
 
     router = Router(
         llm=route_llm_cfg,
         function_list=tool_instances,
-        agents=[
-            vision_assistant(),
-            image_gen_assistant(),
-            code_assistant()
-        ],
+        agents=[vision_assistant(), image_gen_assistant(), code_assistant(), web_search_assistant()],
         name="router",
         description="负责在通用对话与视觉理解助手之间路由。",
     )
@@ -71,7 +70,7 @@ def run_main_chat(messages: List[Dict]) -> str:
     if not responses:
         return ""
     latest = _get_content(responses[-1])
-    return latest or ""
+    return _strip_router_artifacts(latest or "")
 
 
 def stream_agent(messages: List[Dict]) -> Iterator[str]:
@@ -83,7 +82,8 @@ def stream_agent(messages: List[Dict]) -> Iterator[str]:
     for chunk in agent.run(normalized):
         if not chunk:
             continue
-        latest = _get_content(chunk[-1]) or ""
+        raw_latest = _get_content(chunk[-1]) or ""
+        latest = _strip_router_artifacts(raw_latest)
         if latest.startswith(buffer):
             delta = latest[len(buffer):]
         else:
@@ -184,3 +184,22 @@ def _get_content(message) -> str:
         if isinstance(message, dict):
             return message.get("content") or ""
     return ""
+
+
+def _strip_router_artifacts(text: str) -> str:
+    """Remove router Call/Reply markers from assistant output."""
+    if not text:
+        return text
+    content = text.lstrip()
+
+    # Strip leading "Call" or "Reply" markers (with or without colon/whitespace/braces)
+    import re  # local import to avoid global dependency for simple stripping
+
+    content = re.sub(r"^Call\s*:?\s*", "", content, flags=re.IGNORECASE)
+    content = re.sub(r"^Reply\s*:?\s*", "", content, flags=re.IGNORECASE)
+
+    # If the first line was only the marker, drop it
+    if content.startswith("\n"):
+        content = content.lstrip("\n")
+
+    return content.lstrip()

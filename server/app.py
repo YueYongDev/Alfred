@@ -180,7 +180,7 @@ async def chat_completions(request: Request):
         "id": "chatcmpl-xxxx",
         "object": "chat.completion",
         "created": 1234567890,
-        "model": config.LLM_MODEL,
+        "model": config.LLM_ROUTE_MODEL,
         "choices": [
             {
                 "message": {"role": "assistant", "content": answer},

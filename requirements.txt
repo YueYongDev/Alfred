@@ -6,3 +6,4 @@ watchfiles~=0.24.0
 qwen-agent==0.0.31
 qwen-agent[gui,rag,code_interpreter,mcp,python_executor]
 pillow
+ddgs==9.9.1
