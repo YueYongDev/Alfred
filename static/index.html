@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alfred - Your AI Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-shell">
+        <div class="background-blur one"></div>
+        <div class="background-blur two"></div>
+
+        <!-- History -->
+        <aside class="history-panel">
+            <div class="brand-row">
+                <div class="brand-mark">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div>
+                    <div class="brand-name">Alfred</div>
+                    <div class="brand-tagline">Router Agent Control Room</div>
+                </div>
+            </div>
+
+            <div class="history-header">
+                <div>
+                    <div class="history-title">聊天记录</div>
+                    <p class="history-subtitle">最近的多轮对话都在这里，点击可快速切换。</p>
+                </div>
+                <button class="ghost-btn" id="new-thread-btn">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+            <div class="thread-list" id="thread-list"></div>
+        </aside>
+
+        <!-- Main -->
+        <main class="workspace">
+            <header class="topbar">
+                <div class="tab-group" id="view-tabs">
+                    <button class="tab active" data-target="chat-view">
+                        <i class="fa-solid fa-message"></i>
+                        对话
+                    </button>
+                    <button class="tab" data-target="network-view">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        Agent 网络
+                    </button>
+                </div>
+                <div class="topbar-meta">
+                    <div class="badge soft">
+                        <span class="dot online"></span>
+                        在线
+                    </div>
+                    <div class="badge">Router 模式</div>
+                </div>
+            </header>
+
+            <section id="chat-view" class="view active">
+                <div class="messages-container" id="messages-container"></div>
+
+                <div class="composer">
+                    <div class="attachment-bar" id="attachment-bar"></div>
+                    <div class="composer-inner">
+                        <div class="input-actions">
+                            <label for="file-input" class="icon-btn">
+                                <i class="fa-solid fa-paperclip"></i>
+                                <input id="file-input" type="file" multiple accept="image/*,.pdf,.txt,.md,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.json" />
+                            </label>
+                        </div>
+                        <textarea id="user-input" placeholder="发送消息，Shift+Enter 换行" rows="1"></textarea>
+                        <button id="send-btn" class="primary-btn">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="network-view" class="view">
+                <div class="network-hero">
+                    <div>
+                        <div class="eyebrow">Agent & Tool Mesh</div>
+                        <h2>中心 Router + 子 Agent / Tools 的网状拓扑</h2>
+                        <p>直观查看当前能力的连接情况，状态与来源一目了然。</p>
+                    </div>
+                    <div class="stat-row">
+                        <div class="stat-card">
+                            <div class="label">Agents</div>
+                            <div class="value" id="agent-count">--</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="label">Tools</div>
+                            <div class="value" id="tool-count">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="network-canvas">
+                    <canvas id="network-lines"></canvas>
+                    <div class="router-node">
+                        <div class="router-icon">
+                            <i class="fa-solid fa-server"></i>
+                        </div>
+                        <div class="router-name">Router Agent</div>
+                        <div class="router-meta">智能分发 · 多模态调度</div>
+                    </div>
+                    <div class="agent-grid" id="agent-grid">
+                        <div class="loading-item">Loading agents & tools...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,18 +1,44 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 
-from agents.main_chat_agent import stream_agent, run_main_chat
+from agents.main_chat_agent import stream_agent, run_main_chat, get_agent_metadata
 from server import config
 
 logger = logging.getLogger("server.app")
 if not logger.handlers:
     logging.basicConfig(level=logging.INFO)
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "static"
+
 app = FastAPI()
+
+# Mount static files
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.get("/")
+async def serve_frontend():
+    """Serve the main SPA entry."""
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/api/agents")
+async def list_agents():
+    metadata = get_agent_metadata()
+    return JSONResponse(metadata["agents"])
+
+
+@app.get("/api/tools")
+async def list_tools():
+    metadata = get_agent_metadata()
+    return JSONResponse(metadata["tools"])
 
 
 def format_openai_stream_delta(delta_text: str):

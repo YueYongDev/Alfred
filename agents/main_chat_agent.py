@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, Iterator, List
+from typing import Any, Dict, Iterator, List
 
 from qwen_agent.agents import Router
 from qwen_agent.tools import WebSearch, CodeInterpreter
@@ -59,7 +59,54 @@ def build_main_chat_agent() -> Router:
         name="router",
         description="负责在通用对话与视觉理解助手之间路由。",
     )
+    # Keep a reference for metadata queries
+    router.attached_tools = tool_instances
     return router
+
+
+def _tool_meta(tool: Any, agent_name: str | None = None) -> Dict[str, Any]:
+    return {
+        "name": getattr(tool, "name", tool.__class__.__name__),
+        "description": getattr(tool, "description", ""),
+        "agent": agent_name,
+    }
+
+
+def get_agent_metadata() -> Dict[str, Any]:
+    """Return metadata about available agents and tools (with per-agent mapping)."""
+    router = build_main_chat_agent()
+
+    agents_data: List[Dict[str, Any]] = []
+    tools_data: List[Dict[str, Any]] = []
+
+    for agent in router.agents:
+        tool_list = (
+            getattr(agent, "function_list", None)
+            or getattr(agent, "function", None)
+            or getattr(agent, "tools", None)
+            or []
+        )
+        agent_tools = []
+        for tool in tool_list:
+            meta = _tool_meta(tool, agent.name)
+            agent_tools.append(meta)
+            tools_data.append(meta)
+
+        agents_data.append(
+            {
+                "name": getattr(agent, "name", "agent"),
+                "description": getattr(agent, "description", ""),
+                "tools": agent_tools,
+            }
+        )
+
+    for tool in getattr(router, "attached_tools", []):
+        tools_data.append(_tool_meta(tool, "router"))
+
+    return {
+        "agents": agents_data,
+        "tools": tools_data,
+    }
 
 
 def run_main_chat(messages: List[Dict]) -> str:
