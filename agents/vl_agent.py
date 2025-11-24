@@ -22,7 +22,7 @@ def vision_assistant() -> Assistant:
     ]
 
     return Assistant(
-        # function_list=tool_instances,
+        function_list=tool_instances,
         llm=vl_llm_cfg,
         system_message=VISION_PROMPT,
         name="vision",

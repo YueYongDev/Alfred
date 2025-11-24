@@ -80,12 +80,17 @@ def get_agent_metadata() -> Dict[str, Any]:
     tools_data: List[Dict[str, Any]] = []
 
     for agent in router.agents:
-        tool_list = (
-            getattr(agent, "function_list", None)
-            or getattr(agent, "function", None)
-            or getattr(agent, "tools", None)
-            or []
-        )
+        tool_list = []
+        if hasattr(agent, "function_list"):
+            tool_list = agent.function_list
+        elif hasattr(agent, "function_map"):
+            tool_list = list(agent.function_map.values())
+        else:
+            tool_list = (
+                getattr(agent, "function", None)
+                or getattr(agent, "tools", None)
+                or []
+            )
         agent_tools = []
         for tool in tool_list:
             meta = _tool_meta(tool, agent.name)
