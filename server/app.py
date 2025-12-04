@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -7,7 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from agents.main_chat_agent import stream_agent, run_main_chat, get_agent_metadata
+from agents.core.chat_request import ChatRequest, Message, Session, Data
+# 添加必要的导入
+from agents.main_chat_router import MainChatRouter
 from server import config
 
 logger = logging.getLogger("server.app")
@@ -40,6 +43,104 @@ async def list_tools():
     metadata = get_agent_metadata()
     return JSONResponse(metadata["tools"])
 
+def _tool_meta(tool: Any, agent_name: str) -> Dict[str, Any]:
+    """
+    提取工具元数据信息
+
+    Args:
+        tool: 工具对象
+        agent_name: 所属agent名称
+
+    Returns:
+        Dict[str, Any]: 工具元数据字典
+    """
+    try:
+        # 获取工具名称
+        name = getattr(tool, 'name', str(tool.__class__.__name__))
+
+        # 获取工具描述
+        description = getattr(tool, 'description', '')
+        if not description and hasattr(tool, '__doc__'):
+            description = tool.__doc__ or ''
+
+        # 获取工具参数
+        parameters = getattr(tool, 'parameters', {})
+        if not parameters and hasattr(tool, 'function'):
+            # 尝试从 function 属性获取参数信息
+            function_info = tool.function
+            if isinstance(function_info, dict):
+                parameters = function_info.get('parameters', {})
+
+        return {
+            "name": name,
+            "description": description.strip() if description else "",
+            "parameters": parameters,
+            "agent": agent_name
+        }
+    except Exception as e:
+        logger.warning(f"Failed to extract metadata for tool {tool}: {e}")
+        return {
+            "name": str(tool.__class__.__name__),
+            "description": "",
+            "parameters": {},
+            "agent": agent_name
+        }
+
+def get_agent_metadata() -> Dict[str, Any]:
+    """Return metadata about available agents and tools (with per-agent mapping)."""
+    # 创建一个临时的ChatRequest用于初始化router
+    from agents.core.chat_request import ChatRequest, Data
+
+    temp_request = ChatRequest(data=Data(messages=[]))
+
+    router = MainChatRouter(temp_request)
+    # 创建bot实例
+    router._create_bot()
+
+    agents_data: List[Dict[str, Any]] = []
+    tools_data: List[Dict[str, Any]] = []
+
+    # 获取router中的agents
+    if hasattr(router, 'bot') and hasattr(router.bot, 'agents'):
+        agent_list = router.bot.agents
+    else:
+        # 如果没有agents属性，返回空数据
+        agent_list = []
+
+    for agent in agent_list:
+
+        tool_list = []
+        if hasattr(agent, "function_list"):
+            tool_list = agent.function_list
+        elif hasattr(agent, "function_map"):
+            tool_list = list(agent.function_map.values())
+        else:
+            tool_list = (
+                    getattr(agent, "function", None)
+                    or getattr(agent, "tools", None)
+                    or []
+            )
+        agent_tools = []
+        for tool in tool_list:
+            meta = _tool_meta(tool, agent.name)
+            agent_tools.append(meta)
+            tools_data.append(meta)
+
+        agents_data.append(
+            {
+                "name": getattr(agent, "name", "agent"),
+                "description": getattr(agent, "description", ""),
+                "tools": agent_tools,
+            }
+        )
+
+    for tool in getattr(router, "attached_tools", []):
+        tools_data.append(_tool_meta(tool, "router"))
+
+    return {
+        "agents": agents_data,
+        "tools": tools_data,
+    }
 
 def format_openai_stream_delta(delta_text: str):
     # 构造符合 OpenAI Stream 格式的单个 chunk
@@ -113,11 +214,11 @@ def _attach_media(messages: List[Dict[str, Any]], body: Dict[str, Any]) -> List[
         for msg in messages
         if isinstance(msg, dict) and msg.get("role") == "user"
     )
-    
+
     if has_message_level_media:
         # Messages already have media at message level, return as-is
         return messages
-    
+
     # Fall back to legacy behavior: attach from top-level body
     files = body.get("files") or []
     images = body.get("images") or []
@@ -191,17 +292,45 @@ async def chat_completions(request: Request):
     if not question:
         return JSONResponse({"error": "No user message found"}, status_code=400)
 
+    # 构造 ChatRequest 对象
+    chat_request = ChatRequest(
+        model=body.get("model"),
+        task=body.get("task", "text-generation"),
+        session=Session(
+            reqId=str(uuid.uuid4()),
+            sessionId=f"session_{uuid.uuid4()}",
+            userId="user"
+        ),
+        data=Data(
+            messages=[Message(**msg) for msg in messages],
+            stream=stream
+        ),
+        parameters=body.get("parameters", {})
+    )
+
     if stream:
+        # 使用 MainChatRouter 创建事件流
+        router = MainChatRouter(chat_request)
+        event_stream = router.create_event_stream()
+
         def event_generator():
-            for delta in stream_agent(messages):
-                if not delta:
-                    continue
-                yield format_openai_stream_delta(delta)
-            yield "data: [DONE]\n\n"
+            for event in event_stream():
+                yield event
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-    answer = run_main_chat(messages)
+    # 非流式响应
+    router = MainChatRouter(chat_request)
+    response = router.get_non_stream_result()
+
+    # 提取响应内容
+    content = ""
+    if response.data and response.data.messages:
+        for msg in response.data.messages:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                break
+
     return JSONResponse({
         "id": "chatcmpl-xxxx",
         "object": "chat.completion",
@@ -209,7 +338,7 @@ async def chat_completions(request: Request):
         "model": config.LLM_ROUTE_MODEL,
         "choices": [
             {
-                "message": {"role": "assistant", "content": answer},
+                "message": {"role": "assistant", "content": content},
                 "finish_reason": "stop",
                 "index": 0,
             }
