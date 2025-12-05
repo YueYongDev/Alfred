@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Generator
 from qwen_agent.agents import FnCallAgent
 
-from agents.core.chat_request import ChatRequest
+from agents.core.messaging.chat_request import ChatRequest
 
 logger = logging.getLogger(__name__)
 

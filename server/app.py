@@ -8,9 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from agents.core.chat_request import ChatRequest, Message, Session, Data
+from agents.core.messaging.chat_request import ChatRequest, Message, Session, Data
 # 添加必要的导入
-from agents.main_chat_router import MainChatRouter
+from agents.routers.main_chat_router import MainChatRouter
 from server import config
 
 logger = logging.getLogger("server.app")
@@ -89,7 +89,7 @@ def _tool_meta(tool: Any, agent_name: str) -> Dict[str, Any]:
 def get_agent_metadata() -> Dict[str, Any]:
     """Return metadata about available agents and tools (with per-agent mapping)."""
     # 创建一个临时的ChatRequest用于初始化router
-    from agents.core.chat_request import ChatRequest, Data
+    from agents.core.messaging.chat_request import ChatRequest, Data
 
     temp_request = ChatRequest(data=Data(messages=[]))
 
