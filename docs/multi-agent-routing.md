@@ -70,13 +70,13 @@ flowchart TD
 
 ## **2.2 子 Agent 类型**
 
-| **Agent 名称**         | **文件**                          | **能力**             |
-| ---------------------- | --------------------------------- | -------------------- |
-| **基础对话助手**       | agents/chat/basic_chat_agent.py   | 通用问答、兜底       |
-| **多模态助手**         | agents/multimodal/image_agent.py  | 图像识别、图像生成   |
-| **规划助手**           | agents/planning/planning_agent.py | 多步骤工作流拆解     |
-| **代码助手**           | agents/code/code_agent.py         | 代码执行、调试、生成 |
-| **文档助手（可扩展）** | 自定义                            | 文件阅读、检索、翻译 |
+| **Agent 名称**  | **文件**                            | **能力**     |
+| ------------- | --------------------------------- | ---------- |
+| **基础对话助手**    | agents/chat/basic_chat_agent.py   | 通用问答、兜底    |
+| **多模态助手**     | agents/multimodal/image_agent.py  | 图像识别、图像生成  |
+| **规划助手**      | agents/planning/planning_agent.py | 多步骤工作流拆解   |
+| **代码助手**      | agents/code/code_agent.py         | 代码执行、调试、生成 |
+| **文档助手（可扩展）** | 自定义                               | 文件阅读、检索、翻译 |
 
 ---
 
@@ -311,5 +311,3 @@ agents/
 tools/
   orchestration/agent_call.py     # 子 Agent 调度工具
 ```
-
----
