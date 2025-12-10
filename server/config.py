@@ -7,6 +7,7 @@ load_dotenv()
 
 # —— LLM (OpenAI-compatible) ——
 # 统一用 openai 格式，既可指向本地/远程 Ollama，也可指向 OpenAI/其他兼容服务。
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "oai")
 LLM_MODEL = os.getenv("LLM_MODEL", "qwen3:latest")
 LLM_VL_MODEL = os.getenv("LLM_VL_MODEL", "qwen3-vl:4b")
 LLM_CODE_MODEL = os.getenv("LLM_CODE_MODEL", "qwen3-coder-plus")
@@ -21,3 +22,6 @@ WEB_SUMMARY_API = os.getenv("WEB_SUMMARY_API", "http://127.0.0.1:8001/summarize"
 
 # —— API Server ——
 API_SERVER_PORT = int(os.getenv("API_SERVER_PORT", 11435))
+
+SERPER_API_KEY = os.getenv('SERPER_API_KEY', '')
+SERPER_URL = os.getenv('SERPER_URL', 'https://google.serper.dev/search')

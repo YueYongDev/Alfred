@@ -18,10 +18,8 @@ from typing import Any, List, Union
 import requests
 from qwen_agent.tools.base import register_tool
 
+from server import config
 from tools.core.base import QwenAgentBaseTool
-
-SERPER_API_KEY = os.getenv('SERPER_API_KEY', '')
-SERPER_URL = os.getenv('SERPER_URL', 'https://google.serper.dev/search')
 
 
 @register_tool('google_web_search', allow_overwrite=True)
@@ -48,13 +46,13 @@ class GoogleWebSearch(QwenAgentBaseTool):
 
     @staticmethod
     def search(query: str) -> List[Any]:
-        if not SERPER_API_KEY:
+        if not config.SERPER_API_KEY:
             raise ValueError(
                 'SERPER_API_KEY is None! Please Apply for an apikey from https://serper.dev and set it as an environment variable by `export SERPER_API_KEY=xxxxxx`'
             )
-        headers = {'Content-Type': 'application/json', 'X-API-KEY': SERPER_API_KEY}
+        headers = {'Content-Type': 'application/json', 'X-API-KEY': config.SERPER_API_KEY}
         payload = {'q': query}
-        response = requests.post(SERPER_URL, json=payload, headers=headers)
+        response = requests.post(config.SERPER_URL, json=payload, headers=headers)
         response.raise_for_status()
 
         return response.json()['organic']

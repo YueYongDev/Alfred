@@ -41,7 +41,7 @@ class QwenAgentBaseTool(BaseTool):
             # 记录成功执行
             execution_time = time.time() - start_time
             logger.info(f"Tool {self.tool_name} executed successfully in {execution_time:.2f}s")
-            
+            logger.info(f"Tool {self.tool_name} returned: {result}")
             return result
             
         except Exception as e:

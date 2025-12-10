@@ -5,6 +5,7 @@ from qwen_agent.agents import FnCallAgent
 from agents.core.base.agent import QwenBaseAgent
 from agents.core.context.builder import AgentContext
 from agents.core.tools.selector import convert_tool_names_to_instances
+from server import config
 
 
 class CodeAgent(QwenBaseAgent):
@@ -86,13 +87,14 @@ class CodeAgent(QwenBaseAgent):
     def get_llm_config(self) -> Dict[str, Any]:
         """获取LLM配置"""
         generate_cfg = {
-            "enable_thinking": False,
             "temperature": 0.1  # 代码相关任务使用较低的温度以确保准确性
         }
 
         return {
-            "model": "qwen3-code-plus",
-            "model_type": "oai",
+            "model": config.LLM_CODE_MODEL,
+            "model_type": config.LLM_PROVIDER,
+            "model_server": config.LLM_BASE_URL,
+            "api_key": config.LLM_API_KEY,
             "generate_cfg": generate_cfg
         }
 

@@ -17,8 +17,6 @@ class AgentContext(BaseModel):
     file_ids: List[str] = []
     images: List = []
     effective_model: Optional[str] = None
-    enable_thinking: bool = False
-    enable_search: Optional[bool] = None
 
     @field_validator('user_id', 'session_id', 'security_level', 'terminal_type', 'os_group', mode='before')
     @classmethod
@@ -48,34 +46,22 @@ class QwenAgentContextBuilder:
         elif file_list:
             extracted_file_urls = file_list
 
-        # 获取并转换enable_thinking参数为布尔值
-        deep_think_param = (request.parameters or {}).get("custom", {}).get("deep_think")
-        if deep_think_param is not None:
-            if isinstance(deep_think_param, bool):
-                enable_thinking = deep_think_param
-            elif isinstance(deep_think_param, str):
-                enable_thinking = deep_think_param.lower() in ('true', '1', 'yes', 'on')
-            elif isinstance(deep_think_param, (int, float)):
-                enable_thinking = bool(deep_think_param)
-            else:
-                # 对于其他类型，默认为False
-                enable_thinking = False
-        else:
-            # 当deep_think_param为None时，设置默认值为False
-            enable_thinking = False
-
-        # enable_search_param = (request.parameters or {}).get("enable_search", True)
-        depth_search_param = (request.parameters or {}).get("custom", {}).get("depth_search")
-        force_unsearch_param = (request.parameters or {}).get("custom", {}).get("force_unsearch")
-
-        enable_search = None
-        if force_unsearch_param is not None and force_unsearch_param:
-            enable_search = False
-        if depth_search_param is not None and depth_search_param:
-            enable_search = True
-
-        # 组装服务端上下文（不要放进 system 消息）
-        system_params = (request.parameters or {}).get("systemParams", {}) or {}
+        # 组装服务端上下文（从 header.systemParams 获取）
+        system_params = {}
+        if request.header and request.header.systemParams:
+            system_params = {
+                "userId": request.header.systemParams.userId,
+                "sessionId": request.header.sessionId,
+                "securityLevel": getattr(request.header.systemParams, 'securityLevel', None),
+                "terminalType": getattr(request.header.systemParams, 'terminalType', None),
+                "osGroup": getattr(request.header.systemParams, 'osGroup', None),
+            }
+        # 向后兼容旧格式
+        elif request.session:
+            system_params = {
+                "userId": request.session.userId,
+                "sessionId": request.session.sessionId,
+            }
         ctx = AgentContext(
             effective_model="qwen3-max",
             user_id=system_params.get("userId"),
@@ -85,8 +71,6 @@ class QwenAgentContextBuilder:
             os_group=system_params.get("osGroup"),
             files=extracted_file_urls,
             file_ids=[f.get("file_id") for f in file_list if isinstance(f, dict) and f.get("file_id")],
-            images=image_list,
-            enable_thinking=enable_thinking,
-            enable_search=enable_search
+            images=image_list
         )
         return ctx

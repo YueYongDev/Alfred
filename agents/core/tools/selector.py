@@ -1,11 +1,13 @@
+import logging
 from inspect import signature
 from typing import List, Optional
 
 from agents.core.context.builder import AgentContext
-from server.app import logger
 from tools.core.base import QwenAgentBaseTool
 from tools.search.duckduckgo import DuckDuckGoSearch
 from tools.search.google import GoogleWebSearch
+
+logger = logging.getLogger(__name__)
 
 # 工具实例列表
 _all_qwen_tools = [
@@ -25,7 +27,8 @@ def get_all_qwen_tools() -> List[QwenAgentBaseTool]:
     return _all_qwen_tools
 
 
-def convert_tool_names_to_instances(selected_tool_names: List[str], context: AgentContext = None) -> List[QwenAgentBaseTool]:
+def convert_tool_names_to_instances(selected_tool_names: List[str], context: AgentContext = None) -> List[
+    QwenAgentBaseTool]:
     """
     将工具名称转换为工具实例
 

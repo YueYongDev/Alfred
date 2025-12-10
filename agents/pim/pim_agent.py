@@ -2,6 +2,7 @@ from typing import Dict, List
 
 from agents.core.base.agent import QwenBaseAgent
 from agents.core.context.builder import AgentContext
+from server import config
 
 
 class PIMAgent(QwenBaseAgent):
@@ -29,10 +30,8 @@ class PIMAgent(QwenBaseAgent):
         self.context = context
 
     def get_tools(self) -> List[str]:
-        """返回可用工具列表，允许根据上下文禁用联网搜索。"""
-        if self.context and self.context.enable_search is False:
-            return []
-        return ["duckduckgo_search", "google_web_search"]
+        """返回可用工具列表"""
+        return ["duckduckgo_search", "google_web_search", "send_email"]
 
     def get_name(self) -> str:
         return "个人信息管理助手"
@@ -44,11 +43,13 @@ class PIMAgent(QwenBaseAgent):
 
     def get_llm_config(self) -> Dict[str, object]:
         generate_cfg = {
-            "enable_thinking": False,
             "temperature": 0.3,
         }
+
         return {
-            "model": "qwen3-plus",
-            "model_type": "qwen_dashscope",
-            "generate_cfg": generate_cfg,
+            "model": config.LLM_MODEL,
+            "model_type": config.LLM_PROVIDER,
+            "model_server": config.LLM_BASE_URL,
+            "api_key": config.LLM_API_KEY,
+            "generate_cfg": generate_cfg
         }

@@ -5,6 +5,7 @@ from qwen_agent.agents import FnCallAgent
 
 from agents.core.base.agent import QwenBaseAgent
 from agents.core.context.builder import AgentContext
+from server import config
 from tools.orchestration.agent_call import AgentCallTool
 
 
@@ -48,11 +49,11 @@ class PlanningAgent(QwenBaseAgent):
 """
 
     def __init__(
-        self,
-        bot_basic_chat: QwenAgent,
-        bot_image: QwenAgent,
-        bot_doc: Optional[QwenAgent] = None,
-        context: AgentContext = None,
+            self,
+            bot_basic_chat: QwenAgent,
+            bot_image: QwenAgent,
+            bot_doc: Optional[QwenAgent] = None,
+            context: AgentContext = None,
     ):
         """
         初始化总协调助手
@@ -88,7 +89,12 @@ class PlanningAgent(QwenBaseAgent):
 
     def get_llm_config(self) -> Dict[str, Any]:
         """获取LLM配置"""
-        return {"model": "qwen3-max"}
+        return {
+            "model": config.LLM_MODEL,
+            "model_type": config.LLM_PROVIDER,
+            "model_server": config.LLM_BASE_URL,
+            "api_key": config.LLM_API_KEY,
+        }
 
     def create_agent(self) -> FnCallAgent:
         """

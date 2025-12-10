@@ -89,9 +89,16 @@ def _tool_meta(tool: Any, agent_name: str) -> Dict[str, Any]:
 def get_agent_metadata() -> Dict[str, Any]:
     """Return metadata about available agents and tools (with per-agent mapping)."""
     # 创建一个临时的ChatRequest用于初始化router
-    from agents.core.messaging.chat_request import ChatRequest, Data
+    from agents.core.messaging.chat_request import ChatRequest, Header, Body, Message
+    import uuid
 
-    temp_request = ChatRequest(data=Data(messages=[]))
+    temp_request = ChatRequest(
+        header=Header(
+            reqId=str(uuid.uuid4()),
+            sessionId=f"metadata_{uuid.uuid4()}"
+        ),
+        body=Body(messages=[])
+    )
 
     router = MainChatRouter(temp_request)
     # 创建bot实例
@@ -276,74 +283,52 @@ def _log_request_summary(body: Dict[str, Any]) -> None:
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
-    body = await request.json()
-    # _log_request_summary(body)
+    """
+    接收符合新协议的 ChatRequest 对象
+    协议格式：
+    {
+      "model": "qwen3-max",
+      "parameters": {...},
+      "header": {
+        "reqId": "...",
+        "sessionId": "...",
+        "parentMsgId": "...",
+        "systemParams": {...}
+      },
+      "body": {
+        "stream": true,
+        "messages": [...]
+      }
+    }
+    """
+    # 先读取原始请求体用于调试
+    try:
+        body = await request.json()
+        logger.info(f"Received request body: {body}")
 
-    messages = _attach_media(body.get("messages", []), body)
-    stream = body.get("stream", False)
+        # 尝试解析为 ChatRequest
+        chat_request = ChatRequest(**body)
 
-    # 提取用户最新提问（role=user）
-    question = ""
-    for msg in reversed(messages):
-        if msg.get("role") == "user":
-            question = msg.get("content", "")
-            break
+        # 验证消息列表
+        if not chat_request.body.messages:
+            return JSONResponse({"error": "No messages provided"}, status_code=400)
+    except Exception as e:
+        logger.error(f"Failed to parse ChatRequest: {e}")
+        logger.error(f"Request body was: {body}")
+        return JSONResponse(
+            {"error": f"Invalid request format: {str(e)}"},
+            status_code=422
+        )
 
-    if not question:
-        return JSONResponse({"error": "No user message found"}, status_code=400)
-
-    # 构造 ChatRequest 对象
-    chat_request = ChatRequest(
-        model=body.get("model"),
-        task=body.get("task", "text-generation"),
-        session=Session(
-            reqId=str(uuid.uuid4()),
-            sessionId=f"session_{uuid.uuid4()}",
-            userId="user"
-        ),
-        data=Data(
-            messages=[Message(**msg) for msg in messages],
-            stream=stream
-        ),
-        parameters=body.get("parameters", {})
-    )
-
-    if stream:
-        # 使用 MainChatRouter 创建事件流
-        router = MainChatRouter(chat_request)
-        event_stream = router.create_event_stream()
-
-        def event_generator():
-            for event in event_stream():
-                yield event
-
-        return StreamingResponse(event_generator(), media_type="text/event-stream")
-
-    # 非流式响应
+    # 使用 MainChatRouter 创建事件流
     router = MainChatRouter(chat_request)
-    response = router.get_non_stream_result()
+    event_stream = router.create_event_stream()
 
-    # 提取响应内容
-    content = ""
-    if response.data and response.data.messages:
-        for msg in response.data.messages:
-            if msg.get("role") == "assistant":
-                content = msg.get("content", "")
-                break
+    def event_generator():
+        for event in event_stream():
+            yield event
 
-    return JSONResponse({
-        "id": "chatcmpl-xxxx",
-        "object": "chat.completion",
-        "created": 1234567890,
-        "model": config.LLM_ROUTE_MODEL,
-        "choices": [
-            {
-                "message": {"role": "assistant", "content": content},
-                "finish_reason": "stop",
-                "index": 0,
-            }
-        ],
-    })
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 if __name__ == "__main__":

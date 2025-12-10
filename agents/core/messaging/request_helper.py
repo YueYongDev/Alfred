@@ -8,8 +8,16 @@ def convert_chat_request_to_messages(request: ChatRequest) -> List[Dict[str, Any
     将 ChatRequest 转换为 Qwen-Agent 所需的消息列表（保留结构化内容）
     """
     qa_messages: List[Dict[str, Any]] = []
-    if request.data and request.data.messages:
-        for m in request.data.messages:
+
+    # 支持新旧两种格式
+    messages = None
+    if request.body and request.body.messages:
+        messages = request.body.messages
+    elif request.data and request.data.messages:
+        messages = request.data.messages
+
+    if messages:
+        for m in messages:
             role = m.role
             content = m.content if m.content is not None else ""
             if role == 'system':
@@ -138,13 +146,22 @@ def extract_files_from_request(request: ChatRequest) -> List[Dict[str, str]]:
     处理文件列表，将其转换为统一格式
     从请求参数和消息内容中提取文件
     """
-    # 从参数中提取文件列表
-    files_param = (request.parameters or {}).get("files")
-    files_list = _extract_files_from_param_list(files_param)
+    # 从参数中提取文件列表（如果 parameters 是对象，尝试获取 extra 字段）
+    files_param = None
+    if request.parameters:
+        # 如果 parameters 是 Pydantic 对象
+        if hasattr(request.parameters, 'extra'):
+            files_param = request.parameters.extra.get("files") if request.parameters.extra else None
+        # 如果是字典（向后兼容）
+        elif isinstance(request.parameters, dict):
+            files_param = request.parameters.get("files")
+
+    files_list = _extract_files_from_param_list(files_param) if files_param else []
 
     # 从消息内容中提取文件（保留从消息结构中提取文件的功能，但仅用于获取file_id信息）
     message_files = _extract_files_from_messages_content(
-        getattr(request.data, 'messages', None) if request.data else None)
+        getattr(request.body, 'messages', None) if request.body else
+        (getattr(request.data, 'messages', None) if request.data else None))
 
     # 合并两个列表，如果有重复的文件URL，用消息中的file_id更新参数中的file_id
     for file_item in message_files:
@@ -167,8 +184,15 @@ def extract_images_from_request(request: ChatRequest) -> List[str]:
     """
     images: List[str] = []
 
-    if request.data and request.data.messages:
-        for message in request.data.messages:
+    # 支持新旧两种格式
+    messages = None
+    if request.body and request.body.messages:
+        messages = request.body.messages
+    elif request.data and request.data.messages:
+        messages = request.data.messages
+
+    if messages:
+        for message in messages:
             content = message.content if hasattr(message, 'content') else None
 
             # 从富文本消息结构中提取图片

@@ -3,6 +3,7 @@ from typing import Dict, Optional, Any, List
 from qwen_agent.agents import FnCallAgent
 
 from agents.core.base.agent import QwenBaseAgent
+from server import config
 
 
 class BasicChatAgent(QwenBaseAgent):
@@ -14,7 +15,7 @@ class BasicChatAgent(QwenBaseAgent):
 
 你的职责：
 1. 作为默认助手，处理绝大多数普通对话、知识问答和简单任务。
-2. 在需要获取最新信息、搜索网络内容时，可以调用 duckduckgo_search 工具
+2. 在需要获取最新信息、搜索网络内容时，可以调用 搜索 工具
    进行联网搜索，获取实时信息和网络资源。
 3. 当上游路由或其他 Agent 无法处理用户需求时，你需要进行兜底回复，
    用自然语言向用户解释情况，并尽可能给出有帮助的建议或替代方案。
@@ -23,9 +24,7 @@ class BasicChatAgent(QwenBaseAgent):
 - 不要主动声称自己可以直接读取和长期保存用户上传的文件，
   与复杂文档/图片相关的任务通常会由其他专门的 Agent 来处理。
 - 当你无法完成某些需求时，你需要进行兜底回复。
-- 当用户询问需要最新信息或网络搜索的问题时，主动使用 duckduckgo_search 工具。'''
-
-        footer = '''
+- 当用户询问需要最新信息或网络搜索的问题时，主动使用 duckduckgo_search 工具。
 - 在回答用户问题时，不要告诉用户你选择了什么工具或调用了哪些工具，
   应该直接给出结果和答案，让交互体验更加自然流畅。
 '''
@@ -35,7 +34,7 @@ class BasicChatAgent(QwenBaseAgent):
     def get_tools(self) -> List[str]:
         """获取工具列表"""
 
-        return ["duckduckgo_search"]
+        return ["google_web_search"]
 
     def get_name(self) -> str:
         """获取Agent名称"""
@@ -51,7 +50,7 @@ class BasicChatAgent(QwenBaseAgent):
 
     def get_llm_config(self) -> Dict[str, Any]:
         """重写父类方法，提供复杂的LLM配置逻辑"""
-        return self._build_llm_cfg(model=self.context.effective_model, generate_cfg=self._build_generate_cfg())
+        return self._build_llm_cfg(generate_cfg=self._build_generate_cfg())
 
     def create_agent(self) -> FnCallAgent:
         """重写创建Agent方法，添加额外的工具配置逻辑"""
@@ -69,19 +68,12 @@ class BasicChatAgent(QwenBaseAgent):
             包含生成配置的字典
         """
 
-        generate_cfg = {}
+        return {
+            "use_raw_api": True,
+            "max_input_tokens": 60000
+        }
 
-        # 检测是否需要启用思考，确保始终为布尔值
-        enable_thinking = self.context.enable_thinking
-        if enable_thinking is None:
-            enable_thinking = False  # 默认为False，确保不为None
-        generate_cfg["enable_thinking"] = bool(enable_thinking)
-
-        generate_cfg["max_input_tokens"] = 60000
-        generate_cfg['use_raw_api'] = True
-        return generate_cfg
-
-    def _build_llm_cfg(self, model: Optional[str] = None,
+    def _build_llm_cfg(self,
                        generate_cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         构建LLM配置，如果model为空则使用兜底逻辑
@@ -92,14 +84,11 @@ class BasicChatAgent(QwenBaseAgent):
         """
 
         # 根据模型名称确定模型类型
-
-        # model_type = "qwenvl_dashscope"  # 视觉语言模型类型
-        # model_type = "qwen_dashscope"  # 文本模型类型
-
         cfg: Dict[str, Any] = {
-            "model": "qwen3-plus",
-            "model_type": "qwen_dashscope",
-            "api_key": "api_key",
+            "model": config.LLM_MODEL,
+            "model_type": config.LLM_PROVIDER,
+            "model_server": config.LLM_BASE_URL,
+            "api_key": config.LLM_API_KEY,
             "generate_cfg": generate_cfg or {}
         }
         return cfg

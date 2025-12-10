@@ -200,19 +200,82 @@ function setSending(isSending) {
     : '<i class="fa-solid fa-paper-plane"></i>';
 }
 
+// 生成唯一请求ID
+function generateReqId() {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
 async function sendMessage() {
   const text = (els.input.value || "").trim();
   const files = [...state.attachments];
   if ((!text && !files.length) || state.streaming) return;
 
-  const combined = `${text}${attachmentNote(files)}`;
-  const userMsg = { role: "user", content: combined, attachments: files };
   const thread = getActiveThread();
+
+  // 构建消息内容（支持多模态）
+  let userContent = text;
+
+  // 如果有附件，将内容转换为数组格式
+  if (files.length > 0) {
+    const contentParts = [];
+
+    // 添加文本部分
+    if (text) {
+      contentParts.push({
+        type: "text",
+        text: text
+      });
+    }
+
+    // 处理附件
+    for (const att of files) {
+      if (att.file) {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(att.file);
+        });
+
+        if (att.type.startsWith("image/")) {
+          contentParts.push({
+            type: "image_url",
+            image_url: {
+              url: base64
+            }
+          });
+        } else {
+          contentParts.push({
+            type: "file",
+            file: {
+              url: base64,
+              name: att.name,
+              mime_type: att.type,
+              size: att.size
+            }
+          });
+        }
+      }
+    }
+
+    userContent = contentParts;
+  }
+
+  const userMsg = {
+    role: "user",
+    content: userContent,
+    msgId: generateReqId(),
+    attachments: files
+  };
+
   thread.messages.push(userMsg);
   thread.updatedAt = Date.now();
   state.messages = thread.messages;
 
+  // 显示用户消息（使用原来的格式用于UI展示）
+  const combined = `${text}${attachmentNote(files)}`;
   appendMessage("user", combined, files);
+
   els.input.value = "";
   state.attachments = [];
   els.fileInput.value = "";
@@ -226,33 +289,34 @@ async function sendMessage() {
 
   setSending(true);
   try {
-    // Process attachments to Base64
-    const images = [];
-    const filesList = [];
-
-    for (const att of files) {
-      if (att.file) {
-        const base64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result); // data:image/png;base64,...
-          reader.onerror = reject;
-          reader.readAsDataURL(att.file);
-        });
-
-        if (att.type.startsWith("image/")) {
-          images.push(base64);
-        } else {
-          filesList.push(base64);
-        }
-      }
-    }
-
+    // 构建符合新协议的请求体
     const payload = {
       model: "alfred-router",
-      stream: true,
-      messages: thread.messages.map(({ role, content }) => ({ role, content })),
-      images: images, // Top-level images for legacy support in backend
-      files: filesList,
+      parameters: {
+        agentCode: "",
+        resultFormat: "message",
+        enableSearch: true,
+        enableThinking: true
+      },
+      header: {
+        reqId: generateReqId(),
+        sessionId: thread.id,
+        parentMsgId: "",
+        systemParams: {
+          userId: "user",
+          userIp: "",
+          utdId: ""
+        }
+      },
+      body: {
+        stream: true,
+        messages: thread.messages.map(({ role, content, msgId, meta }) => {
+          const msg = { role, content };
+          if (msgId) msg.msgId = msgId;
+          if (meta) msg.meta = meta;
+          return msg;
+        })
+      }
     };
     const res = await fetch("/v1/chat/completions", {
       method: "POST",
@@ -266,6 +330,16 @@ async function sendMessage() {
     let buffer = "";
     let assistantText = "";
     const reader = res.body.getReader();
+    
+    // 创建一个用于显示工具调用和结果的容器
+    const toolCallContainer = document.createElement("div");
+    toolCallContainer.className = "tool-call-container";
+    assistantContainer.innerHTML = "";
+    assistantContainer.appendChild(toolCallContainer);
+    
+    // 存储工具调用状态
+    let currentToolCalls = [];
+    let currentFunctionResults = {};
 
     while (true) {
       const { value, done } = await reader.read();
@@ -285,19 +359,92 @@ async function sendMessage() {
         }
         try {
           const parsed = JSON.parse(data);
-          const delta = parsed?.choices?.[0]?.delta?.content || "";
-          if (!delta) continue;
-          assistantText += delta;
-          assistantContainer.innerHTML = htmlFromMarkdown(assistantText);
+          
+          // 检查是否为完整的工具调用或结果
+          if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta) {
+            // 处理 OpenAI 格式的流数据
+            const delta = parsed.choices[0].delta;
+            
+            // 检查是否有工具调用
+            if (delta.tool_calls) {
+              for (const toolCall of delta.tool_calls) {
+                const index = toolCall.index;
+                if (index >= currentToolCalls.length) {
+                  currentToolCalls[index] = {
+                    id: toolCall.id || '',
+                    function: {
+                      name: toolCall.function?.name || '',
+                      arguments: toolCall.function?.arguments || ''
+                    }
+                  };
+                } else {
+                  // 追加到现有工具调用
+                  if (toolCall.id) currentToolCalls[index].id = toolCall.id;
+                  if (toolCall.function?.name) currentToolCalls[index].function.name = toolCall.function.name;
+                  if (toolCall.function?.arguments) currentToolCalls[index].function.arguments += toolCall.function.arguments || '';
+                }
+              }
+            }
+            // 检查普通文本内容
+            else if (delta.content) {
+              assistantText += delta.content;
+            }
+            
+            // 更新界面显示
+            updateAssistantDisplay(toolCallContainer, currentToolCalls, currentFunctionResults, assistantText);
+          }
+          // 如果不是 OpenAI 格式，则处理自定义格式
+          else if (parsed.role) {
+            // 处理自定义格式的数据
+            if (parsed.role === 'assistant' && parsed.function_call) {
+              // 新的工具调用
+              const toolCall = {
+                id: parsed.extra?.function_id || '',
+                function: {
+                  name: parsed.function_call.name,
+                  arguments: parsed.function_call.arguments
+                }
+              };
+              currentToolCalls.push(toolCall);
+            }
+            else if (parsed.role === 'function') {
+              // 函数执行结果
+              const functionId = parsed.extra?.function_id || '';
+              currentFunctionResults[functionId] = {
+                name: parsed.name,
+                content: parsed.content
+              };
+            }
+            else if (parsed.role === 'assistant' && parsed.content && parsed.content !== '') {
+              // 普通文本内容
+              assistantText += parsed.content;
+            }
+            
+            // 更新界面显示
+            updateAssistantDisplay(toolCallContainer, currentToolCalls, currentFunctionResults, assistantText);
+          }
+          
           scrollToBottom();
         } catch (err) {
           console.warn("Stream parse error", err);
         }
       }
     }
-
-    if (assistantText) {
-      thread.messages.push({ role: "assistant", content: assistantText });
+    
+    // 处理最终的消息存储
+    const finalContent = {
+      content: assistantText,
+      tool_calls: currentToolCalls,
+      function_results: currentFunctionResults
+    };
+    
+    if (assistantText || currentToolCalls.length > 0) {
+      thread.messages.push({
+        role: "assistant",
+        content: assistantText,
+        tool_calls: currentToolCalls,
+        function_results: currentFunctionResults
+      });
       thread.updatedAt = Date.now();
       state.messages = thread.messages;
     } else {
@@ -762,3 +909,84 @@ document.addEventListener("DOMContentLoaded", () => {
   renderMessages(getActiveThread());
   loadMetadata();
 });
+
+function createToolCallElement(toolCall, result) {
+  const toolElement = document.createElement("div");
+  toolElement.className = "tool-call-block";
+  
+  const functionName = toolCall.function.name;
+  const argumentsStr = toolCall.function.arguments;
+  let argsPretty = argumentsStr;
+  
+  try {
+    // 尝试格式化 JSON 参数
+    const argsObj = JSON.parse(argumentsStr);
+    argsPretty = JSON.stringify(argsObj, null, 2);
+  } catch (e) {
+    // 如果不是有效JSON，保持原样
+  }
+  
+  toolElement.innerHTML = `
+    <div class="tool-header">
+      <div class="tool-icon"><i class="fa-solid fa-bolt"></i></div>
+      <div class="tool-info">
+        <div class="tool-name">${functionName}</div>
+        <details class="tool-args">
+          <summary>参数</summary>
+          <pre class="tool-args-content">${argsPretty}</pre>
+        </details>
+      </div>
+    </div>
+    ${result ? `
+    <div class="tool-result-container">
+      <div class="tool-result-header">
+        <span class="tool-result-label">执行结果</span>
+        <button class="toggle-result-btn" data-collapsed="false">收起</button>
+      </div>
+      <div class="tool-result-content">
+        <pre class="tool-result-data">${result}</pre>
+      </div>
+    </div>
+    ` : ''}
+  `;
+  
+  // 添加切换结果显示的事件监听
+  const toggleBtn = toolElement.querySelector('.toggle-result-btn');
+  if (toggleBtn) {
+    const resultContent = toolElement.querySelector('.tool-result-content');
+    toggleBtn.addEventListener('click', () => {
+      const isCollapsed = toggleBtn.dataset.collapsed === 'true';
+      if (isCollapsed) {
+        resultContent.style.display = 'block';
+        toggleBtn.textContent = '收起';
+        toggleBtn.dataset.collapsed = 'false';
+      } else {
+        resultContent.style.display = 'none';
+        toggleBtn.textContent = '展开';
+        toggleBtn.dataset.collapsed = 'true';
+      }
+    });
+  }
+  
+  return toolElement;
+}
+
+function updateAssistantDisplay(container, toolCalls, functionResults, mainContent) {
+  container.innerHTML = '';
+  
+  // 显示工具调用及其结果
+  toolCalls.forEach((toolCall, index) => {
+    const functionId = toolCall.id;
+    const result = functionResults[functionId] ? functionResults[functionId].content : null;
+    const toolElement = createToolCallElement(toolCall, result);
+    container.appendChild(toolElement);
+  });
+  
+  // 如果有主内容，创建内容块
+  if (mainContent) {
+    const contentElement = document.createElement("div");
+    contentElement.className = "main-content-block";
+    contentElement.innerHTML = htmlFromMarkdown(mainContent);
+    container.appendChild(contentElement);
+  }
+}

@@ -1,4 +1,5 @@
 import json
+import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 
@@ -6,8 +7,8 @@ from qwen_agent.agents import FnCallAgent
 
 from agents.core.context.builder import AgentContext
 from agents.core.tools.selector import convert_tool_names_to_instances
-from server.app import logger
 
+logger = logging.getLogger(__name__)
 
 class QwenBaseAgent(ABC):
     """Qwen Agent基类，提供统一的日志记录和通用逻辑"""

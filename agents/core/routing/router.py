@@ -1,14 +1,15 @@
 import copy
+import logging
 from typing import Dict, Iterator, List, Optional, Union
 
 from qwen_agent import Agent, MultiAgentHub
 from qwen_agent.agents import FnCallAgent
 from qwen_agent.llm import BaseChatModel
 from qwen_agent.llm.schema import ASSISTANT, ROLE, SYSTEM, Message
-from server.app import logger
 from qwen_agent.tools import BaseTool
 from qwen_agent.utils.utils import merge_generate_cfgs
 
+logger = logging.getLogger(__name__)
 
 ROUTER_PROMPT = '''
 你的名字是千问，你是一个**严格的任务路由器（Router）**。
