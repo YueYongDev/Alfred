@@ -42,7 +42,7 @@ class MainChatRouter:
 
         # 解析请求消息
         self.qa_messages = convert_chat_request_to_messages(self.request)
-        logger.debug(f"QA Messages: {self.qa_messages}")
+        logger.info(f"QA Messages: {self.qa_messages}")
 
         # 创建智能助手
         self.bot = self._create_bot()

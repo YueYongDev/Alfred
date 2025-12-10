@@ -77,9 +77,9 @@ class QwenBaseAgent(ABC):
 
         # 记录创建日志
         logger.info(f"Creating {self.__class__.__name__} agent")
-        logger.debug(f"{self.__class__.__name__} LLM Config: {json.dumps(llm_config, ensure_ascii=False)}")
-        logger.debug(f"{self.__class__.__name__} System Prompt: {self.SYSTEM_PROMPT[:100]}...")
-        logger.debug(
+        logger.info(f"{self.__class__.__name__} LLM Config: {json.dumps(llm_config, ensure_ascii=False)}")
+        logger.info(f"{self.__class__.__name__} System Prompt: {self.SYSTEM_PROMPT[:100]}...")
+        logger.info(
             f"{self.__class__.__name__} Context: {json.dumps(self.context.model_dump() if self.context else {}, ensure_ascii=False)}")
 
         # 使用动态系统提示词
@@ -105,7 +105,7 @@ class QwenBaseAgent(ABC):
             **kwargs: 工具调用参数
         """
         logger.info(f"{self.__class__.__name__} calling tool: {tool_name}")
-        logger.debug(f"Tool call parameters: {json.dumps(kwargs, ensure_ascii=False)}")
+        logger.info(f"Tool call parameters: {json.dumps(kwargs, ensure_ascii=False)}")
 
     def log_agent_response(self, response: Any):
         """
@@ -115,4 +115,4 @@ class QwenBaseAgent(ABC):
             response: Agent响应内容
         """
         logger.info(f"{self.__class__.__name__} response generated")
-        logger.debug(f"Response length: {len(str(response)) if response else 0}")
+        logger.info(f"Response length: {len(str(response)) if response else 0}")

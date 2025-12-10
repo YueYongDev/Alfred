@@ -200,6 +200,97 @@ function setSending(isSending) {
     : '<i class="fa-solid fa-paper-plane"></i>';
 }
 
+function normalizeContentFragments(content) {
+  const parts = [];
+  if (content === null || content === undefined) return parts;
+
+  if (typeof content === "string") {
+    if (content) parts.push({ type: "text", text: content });
+    return parts;
+  }
+
+  if (Array.isArray(content)) {
+    content.forEach((item) => {
+      parts.push(...normalizeContentFragments(item));
+    });
+    return parts;
+  }
+
+  if (typeof content === "object") {
+    const textVal =
+      (content.type === "text" && content.text) ||
+      content.text ||
+      (typeof content.content === "string" ? content.content : "");
+    if (textVal) {
+      parts.push({ type: "text", text: textVal });
+    }
+
+    const imageUrl =
+      (content.image_url && content.image_url.url) ||
+      content.image ||
+      (content.type === "image_url" ? content.url : "");
+    if (imageUrl) {
+      parts.push({ type: "image", url: imageUrl });
+    }
+
+    const fileValue =
+      (content.file && (content.file.url || content.file.path || content.file)) ||
+      content.url;
+    if (fileValue) {
+      parts.push({
+        type: "file",
+        url: typeof fileValue === "string" ? fileValue : "",
+        name: (content.file && content.file.name) || content.name,
+      });
+    }
+  }
+
+  return parts;
+}
+
+function contentPartsToMarkdown(parts) {
+  const textChunks = [];
+  const extras = [];
+  for (const part of parts) {
+    if (part.type === "text") {
+      textChunks.push(part.text);
+    } else if (part.type === "image" && part.url) {
+      extras.push(`\n\n![image](${part.url})`);
+    } else if (part.type === "file" && (part.url || part.name)) {
+      const label = part.name || part.url || "file";
+      const url = part.url || "#";
+      extras.push(`\n\n[${label}](${url})`);
+    }
+  }
+  return `${textChunks.join("")}${extras.join("")}`;
+}
+
+function extractContentFromPayload(resp) {
+  const messages =
+    (resp &&
+      resp.payload &&
+      resp.payload.output &&
+      resp.payload.output.choices &&
+      resp.payload.output.choices[0] &&
+      resp.payload.output.choices[0].messages) ||
+    (resp &&
+      resp.output &&
+      resp.output.choices &&
+      resp.output.choices[0] &&
+      resp.output.choices[0].messages) ||
+    (resp && resp.choices && resp.choices[0] && resp.choices[0].messages);
+
+  if (!Array.isArray(messages)) return null;
+
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (msg && (msg.role === "assistant" || i === messages.length - 1)) {
+      return msg.content ?? "";
+    }
+  }
+  return null;
+}
+
 // 生成唯一请求ID
 function generateReqId() {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -330,6 +421,7 @@ async function sendMessage() {
     let buffer = "";
     let assistantText = "";
     const reader = res.body.getReader();
+    let assistantContentParts = [];
     
     // 创建一个用于显示工具调用和结果的容器
     const toolCallContainer = document.createElement("div");
@@ -340,6 +432,49 @@ async function sendMessage() {
     // 存储工具调用状态
     let currentToolCalls = [];
     let currentFunctionResults = {};
+
+    const handleMessage = (msg) => {
+      if (!msg || typeof msg !== "object") return { changed: false };
+      let shouldUpdateDisplay = false;
+
+      // 工具调用
+      if (msg.role === "assistant" && msg.function_call) {
+        const toolCall = {
+          id: msg.extra?.function_id || msg.id || "",
+          function: {
+            name: msg.function_call.name,
+            arguments: msg.function_call.arguments || "",
+          },
+        };
+        currentToolCalls.push(toolCall);
+        shouldUpdateDisplay = true;
+      }
+      // 工具返回
+      else if (msg.role === "function") {
+        const functionId = msg.extra?.function_id || msg.id || msg.tool_call_id || "";
+        currentFunctionResults[functionId] = {
+          name: msg.name,
+          content: msg.content,
+        };
+        shouldUpdateDisplay = true;
+      }
+
+      // 主内容
+      if (msg.hasOwnProperty("content")) {
+        assistantContentParts.push(...normalizeContentFragments(msg.content));
+        assistantText = contentPartsToMarkdown(assistantContentParts);
+        shouldUpdateDisplay = true;
+      } else {
+        const payloadContent = extractContentFromPayload(msg);
+        if (payloadContent !== null) {
+          assistantContentParts = normalizeContentFragments(payloadContent);
+          assistantText = contentPartsToMarkdown(assistantContentParts);
+          shouldUpdateDisplay = true;
+        }
+      }
+
+      return { changed: shouldUpdateDisplay };
+    };
 
     while (true) {
       const { value, done } = await reader.read();
@@ -359,72 +494,22 @@ async function sendMessage() {
         }
         try {
           const parsed = JSON.parse(data);
-          
-          // 检查是否为完整的工具调用或结果
-          if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta) {
-            // 处理 OpenAI 格式的流数据
-            const delta = parsed.choices[0].delta;
-            
-            // 检查是否有工具调用
-            if (delta.tool_calls) {
-              for (const toolCall of delta.tool_calls) {
-                const index = toolCall.index;
-                if (index >= currentToolCalls.length) {
-                  currentToolCalls[index] = {
-                    id: toolCall.id || '',
-                    function: {
-                      name: toolCall.function?.name || '',
-                      arguments: toolCall.function?.arguments || ''
-                    }
-                  };
-                } else {
-                  // 追加到现有工具调用
-                  if (toolCall.id) currentToolCalls[index].id = toolCall.id;
-                  if (toolCall.function?.name) currentToolCalls[index].function.name = toolCall.function.name;
-                  if (toolCall.function?.arguments) currentToolCalls[index].function.arguments += toolCall.function.arguments || '';
-                }
-              }
-            }
-            // 检查普通文本内容
-            else if (delta.content) {
-              assistantText += delta.content;
-            }
-            
-            // 更新界面显示
-            updateAssistantDisplay(toolCallContainer, currentToolCalls, currentFunctionResults, assistantText);
+          let changed = false;
+
+          if (Array.isArray(parsed)) {
+            parsed.forEach((msg) => {
+              const res = handleMessage(msg);
+              if (res.changed) changed = true;
+            });
+          } else {
+            const res = handleMessage(parsed);
+            if (res.changed) changed = true;
           }
-          // 如果不是 OpenAI 格式，则处理自定义格式
-          else if (parsed.role) {
-            // 处理自定义格式的数据
-            if (parsed.role === 'assistant' && parsed.function_call) {
-              // 新的工具调用
-              const toolCall = {
-                id: parsed.extra?.function_id || '',
-                function: {
-                  name: parsed.function_call.name,
-                  arguments: parsed.function_call.arguments
-                }
-              };
-              currentToolCalls.push(toolCall);
-            }
-            else if (parsed.role === 'function') {
-              // 函数执行结果
-              const functionId = parsed.extra?.function_id || '';
-              currentFunctionResults[functionId] = {
-                name: parsed.name,
-                content: parsed.content
-              };
-            }
-            else if (parsed.role === 'assistant' && parsed.content && parsed.content !== '') {
-              // 普通文本内容
-              assistantText += parsed.content;
-            }
-            
-            // 更新界面显示
+
+          if (changed) {
             updateAssistantDisplay(toolCallContainer, currentToolCalls, currentFunctionResults, assistantText);
+            scrollToBottom();
           }
-          
-          scrollToBottom();
         } catch (err) {
           console.warn("Stream parse error", err);
         }
@@ -435,7 +520,8 @@ async function sendMessage() {
     const finalContent = {
       content: assistantText,
       tool_calls: currentToolCalls,
-      function_results: currentFunctionResults
+      function_results: currentFunctionResults,
+      raw_content_parts: assistantContentParts
     };
     
     if (assistantText || currentToolCalls.length > 0) {
@@ -443,7 +529,8 @@ async function sendMessage() {
         role: "assistant",
         content: assistantText,
         tool_calls: currentToolCalls,
-        function_results: currentFunctionResults
+        function_results: currentFunctionResults,
+        raw_content_parts: assistantContentParts
       });
       thread.updatedAt = Date.now();
       state.messages = thread.messages;

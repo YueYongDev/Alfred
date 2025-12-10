@@ -23,11 +23,11 @@ class QwenBaseTool(BaseTool, abc.ABC):
         子类需要实现 _execute 方法来处理具体的业务逻辑
         """
         tool_name = self.__class__.__name__
-        logger.debug(tool_name, "call", "start", params, "context", self.context)
+        logger.info(tool_name, "call", "start", params, "context", self.context)
 
         try:
             result = self._execute(params, **kwargs)
-            logger.debug(tool_name, "call", "success", result)
+            logger.info(tool_name, "call", "success", result)
             return result
         except Exception as e:
             error_msg = f"Tool execution error: {str(e)}"

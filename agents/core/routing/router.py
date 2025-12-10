@@ -184,7 +184,7 @@ class QwenAgentRouter(FnCallAgent, MultiAgentHub):
             # logger.info(f'[Router] LLM choose agent: {selected_agent_name}')
             llm_cfg = self.agents[self.agent_names.index(selected_agent_name)].llm
             llm_cfg_info = self._serialize_llm_config(llm_cfg)
-            logger.debug(f"[Router] LLM choose agent: {selected_agent_name}, llm_cfg详细信息: {llm_cfg_info}")
+            logger.info(f"[Router] LLM choose agent: {selected_agent_name}, llm_cfg详细信息: {llm_cfg_info}")
 
         # 3) 找到对应的子 Agent
         if selected_agent_name not in self.agent_names:

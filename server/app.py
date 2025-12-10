@@ -277,8 +277,8 @@ def _log_request_summary(body: Dict[str, Any]) -> None:
         preview,
     )
     if files or images:
-        logger.debug("raw files payload: %s", files)
-        logger.debug("raw images payload: %s", images)
+        logger.info("raw files payload: %s", files)
+        logger.info("raw images payload: %s", images)
 
 
 @app.post("/v1/chat/completions")
@@ -326,6 +326,14 @@ async def chat_completions(request: Request):
 
     def event_generator():
         for event in event_stream():
+            # 后端日志观测每个 SSE chunk（长度截断）
+            try:
+                preview = event if isinstance(event, str) else str(event)
+                if len(preview) > 500:
+                    preview = preview[:500] + "...(truncated)"
+                logger.info("[SSE] sending chunk: %s", preview)
+            except Exception:
+                logger.info("[SSE] sending chunk: <unserializable>")
             yield event
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

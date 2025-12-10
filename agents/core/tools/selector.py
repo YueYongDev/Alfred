@@ -55,7 +55,7 @@ def convert_tool_names_to_instances(selected_tool_names: List[str], context: Age
                 logger.error(exc, f"Failed to initialize tool {tool_name}")
                 continue
         else:
-            logger.debug(f"Warning: Tool {tool_name} not found in tool collection")
+            logger.info(f"Warning: Tool {tool_name} not found in tool collection")
 
     # OneLog.debug(f"Selected Tools: {[getattr(tool, 'name', str(tool)) for tool in selected_tools]}")
     return selected_tools

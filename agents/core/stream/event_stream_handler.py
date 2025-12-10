@@ -8,6 +8,12 @@ from qwen_agent.agents import FnCallAgent
 from agents.core.messaging import ChatRequest
 
 logger = logging.getLogger(__name__)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s %(name)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
 class EventStreamHandler:
@@ -31,70 +37,36 @@ class EventStreamHandler:
 
     def generate_stream(self) -> Generator[str, None, None]:
         """
-        生成 SSE 事件流 - 将 bot.run 的结果转换为 SSE 格式
+        生成 SSE 事件流 - 使用 qwen-agent 原生输出协议
         """
-        logger.debug(f"Starting SSE stream generation, task_id: {self.task_id}")
+        logger.info(f"Starting SSE stream generation, task_id: {self.task_id}")
 
         try:
             result = self.bot.run(messages=self.qa_messages)
             if result is None:
-                logger.debug(f"Agent returned None result, task_id: {self.task_id}")
+                logger.info(f"Agent returned None result, task_id: {self.task_id}")
                 yield "data: {}\n\n"
                 return
 
             # 遍历 bot.run 的结果并转换为 OpenAI SSE 格式
             for chunk in result:
-                # 如果 chunk 是字符串，认为是增量文本内容
-                if isinstance(chunk, str):
-                    # 转换为 OpenAI 格式
-                    openai_chunk = {
-                        "choices": [{
-                            "delta": {
-                                "content": chunk
-                            },
-                            "index": 0
-                        }]
-                    }
-                    json_str = json.dumps(openai_chunk, ensure_ascii=False)
-                    yield f"data: {json_str}\n\n"
-                # 如果 chunk 是字典且包含 content 字段
-                elif isinstance(chunk, dict):
-                    # 检查是否为工具调用或工具结果
-                    if 'function_call' in chunk or chunk.get('role') == 'function':
-                        # 发送完整的工具调用或结果对象
+                # 主动打印原始 chunk，便于排查
+                try:
+                    preview = chunk if isinstance(chunk, str) else jsonable_encoder(chunk)
+                    preview_str = json.dumps(preview, ensure_ascii=False) if not isinstance(preview, str) else preview
+                except Exception:
+                    preview_str = "<unserializable>"
+                logger.info("[raw-chunk] type=%s task_id=%s payload=%s", type(chunk), self.task_id, preview_str[:500])
+
+                # 直接透传 qwen-agent chunk，不做协议转换
+                try:
+                    if isinstance(chunk, (dict, list)):
                         json_str = json.dumps(chunk, ensure_ascii=False)
-                        yield f"data: {json_str}\n\n"
                     else:
-                        content = chunk.get("content", "")
-                        if content:
-                            openai_chunk = {
-                                "choices": [{
-                                    "delta": {
-                                        "content": content
-                                    },
-                                    "index": 0
-                                }]
-                            }
-                            json_str = json.dumps(openai_chunk, ensure_ascii=False)
-                            yield f"data: {json_str}\n\n"
-                # 其他类型尝试提取文本内容
-                else:
-                    try:
-                        # 尝试从对象中提取 content 或转为字符串
-                        content = getattr(chunk, 'content', str(chunk))
-                        if content:
-                            openai_chunk = {
-                                "choices": [{
-                                    "delta": {
-                                        "content": content
-                                    },
-                                    "index": 0
-                                }]
-                            }
-                            json_str = json.dumps(openai_chunk, ensure_ascii=False)
-                            yield f"data: {json_str}\n\n"
-                    except Exception as e:
-                        logger.warning(f"Failed to process chunk type: {type(chunk)}, task_id: {self.task_id}, error: {e}")
+                        json_str = str(chunk)
+                    yield f"data: {json_str}\n\n"
+                except Exception as e:
+                    logger.warning(f"Failed to emit chunk: type={type(chunk)}, task_id={self.task_id}, error={e}")
 
             # 正常结束，发送 DONE 标记
             yield "data: [DONE]\n\n"
@@ -106,4 +78,4 @@ class EventStreamHandler:
             # 错误结束，也发送 DONE 标记
             yield "data: [DONE]\n\n"
 
-        logger.debug(f"SSE stream generation completed, task_id: {self.task_id}")
+        logger.info(f"SSE stream generation completed, task_id: {self.task_id}")
