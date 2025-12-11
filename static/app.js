@@ -5,6 +5,7 @@ const state = {
   attachments: [],
   agents: [],
   tools: [],
+  searchQuery: "",
   // Topology state
   nodes: [], // { id, type, x, y, el, data }
   pan: { x: 0, y: 0 },
@@ -19,6 +20,7 @@ const els = {
   send: document.getElementById("send-btn"),
   threadList: document.getElementById("thread-list"),
   newThreadBtn: document.getElementById("new-thread-btn"),
+  threadSearch: document.getElementById("thread-search"),
   tabs: document.getElementById("view-tabs"),
   views: document.querySelectorAll(".view"),
   fileInput: document.getElementById("file-input"),
@@ -50,15 +52,54 @@ function formatTime(ts) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function contentToPlainText(content) {
+  if (content === null || content === undefined) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content.map(contentToPlainText).join(" ");
+  }
+  if (typeof content === "object") {
+    const pieces = [];
+    if (typeof content.text === "string") pieces.push(content.text);
+    if (typeof content.content === "string") pieces.push(content.content);
+    if (typeof content.name === "string") pieces.push(content.name);
+    if (typeof content.caption === "string") pieces.push(content.caption);
+    // Fallback: try to read nested url/description fields that may carry text
+    if (typeof content.url === "string") pieces.push(content.url);
+    if (typeof content.description === "string") pieces.push(content.description);
+    return pieces.join(" ");
+  }
+  return "";
+}
+
 function renderThreads() {
   els.threadList.innerHTML = "";
-  if (!state.threads.length) {
-    els.threadList.innerHTML =
-      '<div class="loading-item">暂无历史记录，开始一段新的对话吧。</div>';
+  const query = (state.searchQuery || "").trim().toLowerCase();
+  let list = !query
+    ? state.threads
+    : state.threads.filter((thread) => {
+        const titleMatch = thread.title.toLowerCase().includes(query);
+        const messageMatch = thread.messages.some((msg) => {
+          const text = contentToPlainText(msg.content).toLowerCase();
+          return text.includes(query);
+        });
+        return titleMatch || messageMatch;
+      });
+
+  const activeThread = getActiveThread();
+  if (query && activeThread && !list.includes(activeThread)) {
+    list = [activeThread, ...list];
+  }
+
+  if (!list.length) {
+    const emptyText = query
+      ? "没有找到匹配的对话，换个关键词试试。"
+      : "暂无历史记录，开始一段新的对话吧。";
+    els.threadList.innerHTML = `<div class="loading-item">${emptyText}</div>`;
     return;
   }
 
-  for (const thread of state.threads) {
+  for (const thread of list) {
     const div = document.createElement("div");
     div.className = `thread ${thread.id === state.activeThreadId ? "active" : ""}`;
     div.dataset.id = thread.id;
@@ -936,6 +977,13 @@ function bindEvents() {
     renderThreads();
     setActiveThread(id);
   });
+
+  if (els.threadSearch) {
+    els.threadSearch.addEventListener("input", (e) => {
+      state.searchQuery = e.target.value || "";
+      renderThreads();
+    });
+  }
 
   els.tabs.addEventListener("click", (e) => {
     const btn = e.target.closest(".tab");

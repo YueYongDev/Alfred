@@ -113,6 +113,31 @@ body {
     font-size: 13px;
 }
 
+.history-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0 18px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: #fff;
+    box-shadow: var(--shadow);
+}
+
+.history-search i {
+    color: var(--muted);
+}
+
+.history-search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    background: transparent;
+    color: var(--text);
+}
+
 .ghost-btn {
     width: 36px;
     height: 36px;

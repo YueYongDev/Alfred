@@ -8,7 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from agents.core.messaging.chat_request import ChatRequest, Message, Session, Data
+from agents.core.messaging.chat_request import (Body, ChatRequest, Header,
+                                                Message, Parameters,
+                                                SystemParams)
 # 添加必要的导入
 from agents.routers.main_chat_router import MainChatRouter
 from server import config
@@ -281,6 +283,103 @@ def _log_request_summary(body: Dict[str, Any]) -> None:
         logger.info("raw images payload: %s", images)
 
 
+def _normalize_openai_content(content: Any) -> Any:
+    """Convert OpenAI style content to the internal multimodal structure."""
+    if isinstance(content, list):
+        parts: List[Any] = []
+        for item in content:
+            if isinstance(item, dict):
+                ctype = item.get("type")
+                if ctype == "text":
+                    if item.get("text"):
+                        parts.append({"text": item["text"]})
+                    continue
+                if ctype == "image_url":
+                    image_obj = item.get("image_url") or {}
+                    url = None
+                    if isinstance(image_obj, dict):
+                        url = (
+                            image_obj.get("url")
+                            or image_obj.get("data")
+                            or image_obj.get("base64")
+                            or image_obj.get("content")
+                        )
+                    elif isinstance(image_obj, str):
+                        url = image_obj
+                    if url:
+                        parts.append({"image": url})
+                    continue
+                # Fallback for already-normalized dicts
+                if "text" in item or "image" in item or "file" in item:
+                    parts.append(item)
+                    continue
+            elif isinstance(item, str):
+                parts.append(item)
+        return parts
+    return content
+
+
+def _build_chat_request_from_openai_payload(body: Dict[str, Any]) -> ChatRequest:
+    """
+    将 OpenAI 兼容的请求体转换为内部 ChatRequest 结构。
+    """
+    req_id = (
+        body.get("req_id")
+        or body.get("id")
+        or body.get("request_id")
+        or str(uuid.uuid4())
+    )
+    session_id = (
+        body.get("session_id")
+        or body.get("conversation_id")
+        or body.get("user")
+        or req_id
+    )
+    stream = body.get("stream", True)
+
+    raw_messages: List[Dict[str, Any]] = []
+    for msg in body.get("messages", []) or []:
+        if not isinstance(msg, dict):
+            continue
+        role = msg.get("role")
+        if not role:
+            continue
+        normalized = {
+            "role": role,
+            "content": _normalize_openai_content(msg.get("content")),
+        }
+        if msg.get("id") or msg.get("msgId"):
+            normalized["msgId"] = msg.get("id") or msg.get("msgId")
+        if msg.get("meta") or msg.get("metadata"):
+            normalized["meta"] = msg.get("meta") or msg.get("metadata")
+        raw_messages.append(normalized)
+
+    # Attach legacy top-level images/files if present
+    raw_messages = _attach_media(raw_messages, body)
+    messages = [Message(**m) for m in raw_messages]
+
+    header = Header(
+        reqId=req_id,
+        sessionId=session_id,
+        parentMsgId=body.get("parent_message_id"),
+        systemParams=SystemParams(userId=body.get("user") or "user"),
+    )
+
+    parameters = None
+    if isinstance(body.get("parameters"), dict):
+        try:
+            parameters = Parameters(**body["parameters"])
+        except Exception:
+            parameters = None
+
+    return ChatRequest(
+        model=body.get("model"),
+        parameters=parameters,
+        header=header,
+        body=Body(stream=stream, messages=messages),
+    )
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
     """
@@ -306,10 +405,13 @@ async def chat_completions(request: Request):
         body = await request.json()
         logger.info(f"Received request body: {body}")
 
-        # 尝试解析为 ChatRequest
-        chat_request = ChatRequest(**body)
+        # 支持两种协议：直接的 ChatRequest，或 OpenAI 兼容格式
+        if isinstance(body, dict) and body.get("header") and body.get("body"):
+            chat_request = ChatRequest(**body)
+        else:
+            _log_request_summary(body if isinstance(body, dict) else {})
+            chat_request = _build_chat_request_from_openai_payload(body)
 
-        # 验证消息列表
         if not chat_request.body.messages:
             return JSONResponse({"error": "No messages provided"}, status_code=400)
     except Exception as e:
