@@ -3,7 +3,7 @@ from typing import Any
 
 from qwen_agent.agents import FnCallAgent
 
-from agents.chat.basic_chat_agent import BasicChatAgent
+from agents.chat.main_chat_agent import MainChatAgent
 from agents.core.context.builder import QwenAgentContextBuilder
 from agents.core.messaging.chat_request import ChatRequest
 from agents.core.messaging.request_helper import convert_chat_request_to_messages
@@ -17,7 +17,7 @@ from server import config
 
 logger = logging.getLogger(__name__)
 
-class MainChatRouter:
+class AgentRouter:
     """主聊天代理类，负责创建和管理聊天流程"""
 
     def __init__(self, request: ChatRequest):
@@ -62,7 +62,7 @@ class MainChatRouter:
         ctx = QwenAgentContextBuilder.buildContext(self.request, self.qa_messages)
 
         # 基础对话助手（默认兜底Agent，放在第一位）
-        bot_basic_chat = BasicChatAgent(ctx).create_agent()
+        bot_basic_chat = MainChatAgent(ctx).create_agent()
 
         # 多模态Agent（图片理解、图片生成、图片修改）
         bot_image = ImageAgent(ctx).create_agent()
@@ -85,7 +85,7 @@ class MainChatRouter:
         }
         main_chat_router = QwenAgentRouter(
             llm=main_chat_router_llm_config,
-            agents=[bot_basic_chat, bot_image, bot_pim, bot_plan],  # BasicChatAgent放在第一位作为默认兜底
+            agents=[bot_basic_chat, bot_image, bot_pim, bot_plan],  # MainChatAgent放在第一位作为默认兜底
             function_list=[],
         )
         return main_chat_router

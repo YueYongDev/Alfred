@@ -13,7 +13,7 @@ Qwen-Agent 路由层（Router）的核心目标是：
 
 ```mermaid
 flowchart TD
-    User["用户输入"] --> MainRouter["MainChatRouter"]
+    User["用户输入"] --> MainRouter["AgentRouter"]
     MainRouter --> QwenAgentRouter["QwenAgentRouter (LLM 路由器)"]
 
     QwenAgentRouter -->|命中启发式| PrevAgent["上一轮 Agent"]
@@ -89,7 +89,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant M as MainChatRouter
+    participant M as AgentRouter
     participant R as QwenAgentRouter
     participant L as 路由LLM
     participant SA as 子 Agent

@@ -8,11 +8,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
-from agents.core.messaging.chat_request import (Body, ChatRequest, Header,
-                                                Message, Parameters,
-                                                SystemParams)
+from agents.core.messaging.chat_request import ChatRequest
 # 添加必要的导入
-from agents.routers.main_chat_router import MainChatRouter
+from agents.routers.agent_router import AgentRouter
 from server import config
 
 logger = logging.getLogger("server.app")
@@ -91,18 +89,16 @@ def _tool_meta(tool: Any, agent_name: str) -> Dict[str, Any]:
 def get_agent_metadata() -> Dict[str, Any]:
     """Return metadata about available agents and tools (with per-agent mapping)."""
     # 创建一个临时的ChatRequest用于初始化router
-    from agents.core.messaging.chat_request import ChatRequest, Header, Body, Message
+    from agents.core.messaging.chat_request import ChatRequest
     import uuid
 
     temp_request = ChatRequest(
-        header=Header(
-            reqId=str(uuid.uuid4()),
-            sessionId=f"metadata_{uuid.uuid4()}"
-        ),
-        body=Body(messages=[])
+        req_id=str(uuid.uuid4()),
+        session_id=f"metadata_{uuid.uuid4()}",
+        messages=[],
     )
 
-    router = MainChatRouter(temp_request)
+    router = AgentRouter(temp_request)
     # 创建bot实例
     router._create_bot()
 
@@ -151,106 +147,12 @@ def get_agent_metadata() -> Dict[str, Any]:
         "tools": tools_data,
     }
 
-def format_openai_stream_delta(delta_text: str):
-    # 构造符合 OpenAI Stream 格式的单个 chunk
-    data = {
-        "choices": [
-            {
-                "delta": {"content": delta_text},
-                "index": 0,
-                "finish_reason": None,
-            }
-        ],
-        "object": "chat.completion.chunk",
-    }
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
-
-
 def _find_latest_user(messages: List[Dict[str, Any]]) -> Tuple[int, Dict[str, Any] | None]:
     for idx in range(len(messages) - 1, -1, -1):
         msg = messages[idx]
         if isinstance(msg, dict) and msg.get("role") == "user":
             return idx, msg
     return -1, None
-
-
-def _ensure_list_content(content: Any) -> List[Dict[str, Any]]:
-    if isinstance(content, list):
-        return [part for part in content if isinstance(part, dict)]
-    if isinstance(content, str):
-        return [{"type": "text", "text": content}] if content else []
-    return []
-
-
-def _image_part_from_payload(image: Any) -> Dict[str, Any] | None:
-    url = None
-    if isinstance(image, str):
-        url = image
-    elif isinstance(image, dict):
-        url = (
-                image.get("url")
-                or image.get("data")
-                or image.get("base64")
-                or image.get("content")
-                or image.get("path")
-        )
-    if url:
-        return {"type": "image_url", "image_url": {"url": url}}
-    return None
-
-
-def _file_part_from_payload(file_item: Any) -> Dict[str, Any] | None:
-    value = None
-    if isinstance(file_item, str):
-        value = file_item
-    elif isinstance(file_item, dict):
-        value = (
-                file_item.get("url")
-                or file_item.get("path")
-                or file_item.get("data")
-                or file_item.get("content")
-        )
-    if value:
-        return {"type": "file", "file": value}
-    return None
-
-
-def _attach_media(messages: List[Dict[str, Any]], body: Dict[str, Any]) -> List[Dict[str, Any]]:
-    # Check if messages already contain images/files at message level
-    # If they do, we don't need to attach from top-level body
-    has_message_level_media = any(
-        msg.get("images") or msg.get("files")
-        for msg in messages
-        if isinstance(msg, dict) and msg.get("role") == "user"
-    )
-
-    if has_message_level_media:
-        # Messages already have media at message level, return as-is
-        return messages
-
-    # Fall back to legacy behavior: attach from top-level body
-    files = body.get("files") or []
-    images = body.get("images") or []
-    if not files and not images:
-        return messages
-
-    merged = list(messages)
-    idx, user_msg = _find_latest_user(merged)
-    if idx < 0 or not isinstance(user_msg, dict):
-        return merged
-
-    content_parts = _ensure_list_content(user_msg.get("content"))
-    for image in images:
-        part = _image_part_from_payload(image)
-        if part:
-            content_parts.append(part)
-    for file_item in files:
-        part = _file_part_from_payload(file_item)
-        if part:
-            content_parts.append(part)
-
-    merged[idx] = {**user_msg, "content": content_parts}
-    return merged
 
 
 def _log_request_summary(body: Dict[str, Any]) -> None:
@@ -283,121 +185,17 @@ def _log_request_summary(body: Dict[str, Any]) -> None:
         logger.info("raw images payload: %s", images)
 
 
-def _normalize_openai_content(content: Any) -> Any:
-    """Convert OpenAI style content to the internal multimodal structure."""
-    if isinstance(content, list):
-        parts: List[Any] = []
-        for item in content:
-            if isinstance(item, dict):
-                ctype = item.get("type")
-                if ctype == "text":
-                    if item.get("text"):
-                        parts.append({"text": item["text"]})
-                    continue
-                if ctype == "image_url":
-                    image_obj = item.get("image_url") or {}
-                    url = None
-                    if isinstance(image_obj, dict):
-                        url = (
-                            image_obj.get("url")
-                            or image_obj.get("data")
-                            or image_obj.get("base64")
-                            or image_obj.get("content")
-                        )
-                    elif isinstance(image_obj, str):
-                        url = image_obj
-                    if url:
-                        parts.append({"image": url})
-                    continue
-                # Fallback for already-normalized dicts
-                if "text" in item or "image" in item or "file" in item:
-                    parts.append(item)
-                    continue
-            elif isinstance(item, str):
-                parts.append(item)
-        return parts
-    return content
-
-
-def _build_chat_request_from_openai_payload(body: Dict[str, Any]) -> ChatRequest:
-    """
-    将 OpenAI 兼容的请求体转换为内部 ChatRequest 结构。
-    """
-    req_id = (
-        body.get("req_id")
-        or body.get("id")
-        or body.get("request_id")
-        or str(uuid.uuid4())
-    )
-    session_id = (
-        body.get("session_id")
-        or body.get("conversation_id")
-        or body.get("user")
-        or req_id
-    )
-    stream = body.get("stream", True)
-
-    raw_messages: List[Dict[str, Any]] = []
-    for msg in body.get("messages", []) or []:
-        if not isinstance(msg, dict):
-            continue
-        role = msg.get("role")
-        if not role:
-            continue
-        normalized = {
-            "role": role,
-            "content": _normalize_openai_content(msg.get("content")),
-        }
-        if msg.get("id") or msg.get("msgId"):
-            normalized["msgId"] = msg.get("id") or msg.get("msgId")
-        if msg.get("meta") or msg.get("metadata"):
-            normalized["meta"] = msg.get("meta") or msg.get("metadata")
-        raw_messages.append(normalized)
-
-    # Attach legacy top-level images/files if present
-    raw_messages = _attach_media(raw_messages, body)
-    messages = [Message(**m) for m in raw_messages]
-
-    header = Header(
-        reqId=req_id,
-        sessionId=session_id,
-        parentMsgId=body.get("parent_message_id"),
-        systemParams=SystemParams(userId=body.get("user") or "user"),
-    )
-
-    parameters = None
-    if isinstance(body.get("parameters"), dict):
-        try:
-            parameters = Parameters(**body["parameters"])
-        except Exception:
-            parameters = None
-
-    return ChatRequest(
-        model=body.get("model"),
-        parameters=parameters,
-        header=header,
-        body=Body(stream=stream, messages=messages),
-    )
-
-
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request):
     """
-    接收符合新协议的 ChatRequest 对象
-    协议格式：
+    接收 ChatRequest 对象（精简版）
     {
       "model": "qwen3-max",
-      "parameters": {...},
-      "header": {
-        "reqId": "...",
-        "sessionId": "...",
-        "parentMsgId": "...",
-        "systemParams": {...}
-      },
-      "body": {
-        "stream": true,
-        "messages": [...]
-      }
+      "stream": true,
+      "messages": [...],
+      "req_id": "...",
+      "session_id": "...",
+      "user_id": "..."
     }
     """
     # 先读取原始请求体用于调试
@@ -405,14 +203,10 @@ async def chat_completions(request: Request):
         body = await request.json()
         logger.info(f"Received request body: {body}")
 
-        # 支持两种协议：直接的 ChatRequest，或 OpenAI 兼容格式
-        if isinstance(body, dict) and body.get("header") and body.get("body"):
-            chat_request = ChatRequest(**body)
-        else:
-            _log_request_summary(body if isinstance(body, dict) else {})
-            chat_request = _build_chat_request_from_openai_payload(body)
+        _log_request_summary(body if isinstance(body, dict) else {})
+        chat_request = ChatRequest(**body)
 
-        if not chat_request.body.messages:
+        if not chat_request.messages:
             return JSONResponse({"error": "No messages provided"}, status_code=400)
     except Exception as e:
         logger.error(f"Failed to parse ChatRequest: {e}")
@@ -422,8 +216,8 @@ async def chat_completions(request: Request):
             status_code=422
         )
 
-    # 使用 MainChatRouter 创建事件流
-    router = MainChatRouter(chat_request)
+    # 使用 AgentRouter 创建事件流
+    router = AgentRouter(chat_request)
     event_stream = router.create_event_stream()
 
     def event_generator():

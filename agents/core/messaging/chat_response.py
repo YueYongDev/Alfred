@@ -7,6 +7,7 @@ from agents.core.messaging.chat_request import Message
 
 
 class Custom(BaseModel):
+    model_config = {"protected_namespaces": ()}
     model_name: str = ""
     search_prob: str = "impossible"
     task_category: List[str] = Field(default_factory=list)
@@ -31,6 +32,7 @@ class Output(BaseModel):
 
 
 class Usage(BaseModel):
+    model_config = {"protected_namespaces": ()}
     completion_tokens: int = 0
     output_tokens: int = 0
     input_tokens: int = 0

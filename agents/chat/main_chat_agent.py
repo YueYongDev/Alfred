@@ -6,27 +6,15 @@ from agents.core.base.agent import QwenBaseAgent
 from server import config
 
 
-class BasicChatAgent(QwenBaseAgent):
+class MainChatAgent(QwenBaseAgent):
     """基础对话助手"""
 
     def get_system_prompt(self) -> str:
         base_prompt = f'''
-你的名字是千问
-
-你的职责：
-1. 作为默认助手，处理绝大多数普通对话、知识问答和简单任务。
-2. 在需要获取最新信息、搜索网络内容时，可以调用 搜索 工具
-   进行联网搜索，获取实时信息和网络资源。
-3. 当上游路由或其他 Agent 无法处理用户需求时，你需要进行兜底回复，
-   用自然语言向用户解释情况，并尽可能给出有帮助的建议或替代方案。
-
-注意：
-- 不要主动声称自己可以直接读取和长期保存用户上传的文件，
-  与复杂文档/图片相关的任务通常会由其他专门的 Agent 来处理。
-- 当你无法完成某些需求时，你需要进行兜底回复。
-- 当用户询问需要最新信息或网络搜索的问题时，主动使用 duckduckgo_search 工具。
-- 在回答用户问题时，不要告诉用户你选择了什么工具或调用了哪些工具，
-  应该直接给出结果和答案，让交互体验更加自然流畅。
+你是千问，默认对话助手。处理普通问答、闲聊和简单任务。
+需要最新信息时使用 google_web_search。
+无法完成时给出简短兜底说明与可行替代建议。
+不声称可长期保存或直接读取用户文件；回答时不暴露工具调用细节。
 '''
 
         return base_prompt
@@ -69,7 +57,7 @@ class BasicChatAgent(QwenBaseAgent):
         """
 
         return {
-            "use_raw_api": True,
+            "use_raw_api": False,
             "max_input_tokens": 60000
         }
 

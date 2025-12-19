@@ -371,20 +371,12 @@ async function sendMessage() {
 
         if (att.type.startsWith("image/")) {
           contentParts.push({
-            type: "image_url",
-            image_url: {
-              url: base64
-            }
+            image: base64
           });
         } else {
           contentParts.push({
-            type: "file",
-            file: {
-              url: base64,
-              name: att.name,
-              mime_type: att.type,
-              size: att.size
-            }
+            file: base64,
+            name: att.name
           });
         }
       }
@@ -396,7 +388,7 @@ async function sendMessage() {
   const userMsg = {
     role: "user",
     content: userContent,
-    msgId: generateReqId(),
+    name: "user",
     attachments: files
   };
 
@@ -421,34 +413,19 @@ async function sendMessage() {
 
   setSending(true);
   try {
-    // 构建符合新协议的请求体
+    // 构建最新协议的请求体
     const payload = {
       model: "alfred-router",
-      parameters: {
-        agentCode: "",
-        resultFormat: "message",
-        enableSearch: true,
-        enableThinking: true
-      },
-      header: {
-        reqId: generateReqId(),
-        sessionId: thread.id,
-        parentMsgId: "",
-        systemParams: {
-          userId: "user",
-          userIp: "",
-          utdId: ""
-        }
-      },
-      body: {
-        stream: true,
-        messages: thread.messages.map(({ role, content, msgId, meta }) => {
-          const msg = { role, content };
-          if (msgId) msg.msgId = msgId;
-          if (meta) msg.meta = meta;
-          return msg;
-        })
-      }
+      stream: true,
+      req_id: generateReqId(),
+      session_id: thread.id,
+      user_id: "user",
+      messages: thread.messages.map(({ role, content, name, metadata }) => {
+        const msg = { role, content };
+        if (name) msg.name = name;
+        if (metadata) msg.metadata = metadata;
+        return msg;
+      })
     };
     const res = await fetch("/v1/chat/completions", {
       method: "POST",
@@ -474,35 +451,72 @@ async function sendMessage() {
     let currentToolCalls = [];
     let currentFunctionResults = {};
 
-    const handleMessage = (msg) => {
+    const handleMessage = (msg, replaceContent = false) => {
       if (!msg || typeof msg !== "object") return { changed: false };
       let shouldUpdateDisplay = false;
 
       // 工具调用
       if (msg.role === "assistant" && msg.function_call) {
+        const toolId = msg.extra?.function_id || msg.id || "";
+        const name = msg.function_call.name || "";
+        const args = msg.function_call.arguments || "";
         const toolCall = {
-          id: msg.extra?.function_id || msg.id || "",
+          id: toolId,
           function: {
-            name: msg.function_call.name,
-            arguments: msg.function_call.arguments || "",
+            name,
+            arguments: args,
           },
         };
-        currentToolCalls.push(toolCall);
+
+        let existingIndex = -1;
+        if (toolId) {
+          existingIndex = currentToolCalls.findIndex((t) => t.id === toolId);
+        } else if (name) {
+          existingIndex = currentToolCalls.findIndex(
+            (t) => t.function && t.function.name === name
+          );
+        }
+
+        if (existingIndex >= 0) {
+          const existing = currentToolCalls[existingIndex];
+          const prevArgs = existing.function.arguments || "";
+          let nextArgs = prevArgs;
+          if (args) {
+            nextArgs = args.startsWith(prevArgs) ? args : `${prevArgs}${args}`;
+          }
+          currentToolCalls[existingIndex] = {
+            ...existing,
+            function: {
+              name: name || existing.function.name,
+              arguments: nextArgs || existing.function.arguments || "",
+            },
+          };
+        } else {
+          currentToolCalls.push(toolCall);
+        }
         shouldUpdateDisplay = true;
       }
       // 工具返回
       else if (msg.role === "function") {
         const functionId = msg.extra?.function_id || msg.id || msg.tool_call_id || "";
+        const contentParts = normalizeContentFragments(msg.content);
+        const nextContent = contentPartsToMarkdown(contentParts);
+        const prev = currentFunctionResults[functionId];
+        const prevContent = prev ? prev.content || "" : "";
+        const delta = nextContent.startsWith(prevContent)
+          ? nextContent.slice(prevContent.length)
+          : nextContent;
         currentFunctionResults[functionId] = {
-          name: msg.name,
-          content: msg.content,
+          name: msg.name || (prev && prev.name) || "",
+          content: prev ? `${prevContent}${delta}` : nextContent,
         };
         shouldUpdateDisplay = true;
       }
 
       // 主内容
       if (msg.hasOwnProperty("content")) {
-        assistantContentParts.push(...normalizeContentFragments(msg.content));
+        const nextParts = normalizeContentFragments(msg.content);
+        assistantContentParts = replaceContent ? nextParts : [...assistantContentParts, ...nextParts];
         assistantText = contentPartsToMarkdown(assistantContentParts);
         shouldUpdateDisplay = true;
       } else {
@@ -538,12 +552,23 @@ async function sendMessage() {
           let changed = false;
 
           if (Array.isArray(parsed)) {
+            let lastAssistant = null;
             parsed.forEach((msg) => {
-              const res = handleMessage(msg);
-              if (res.changed) changed = true;
+              if (msg && msg.role === "assistant" && msg.hasOwnProperty("content")) {
+                lastAssistant = msg;
+              }
+              if (msg && (msg.role === "assistant" || msg.role === "function")) {
+                const res = handleMessage(msg);
+                if (res.changed) changed = true;
+              }
             });
+            if (lastAssistant) {
+              const res = handleMessage(lastAssistant, true);
+              if (res.changed) changed = true;
+            }
           } else {
-            const res = handleMessage(parsed);
+            const replace = parsed && parsed.role === "assistant" && parsed.hasOwnProperty("content");
+            const res = handleMessage(parsed, replace);
             if (res.changed) changed = true;
           }
 
@@ -1074,11 +1099,11 @@ function createToolCallElement(toolCall, result) {
     </div>
     ${result ? `
     <div class="tool-result-container">
-      <div class="tool-result-header">
-        <span class="tool-result-label">执行结果</span>
-        <button class="toggle-result-btn" data-collapsed="false">收起</button>
-      </div>
-      <div class="tool-result-content">
+    <div class="tool-result-header">
+      <span class="tool-result-label">执行结果</span>
+      <button class="toggle-result-btn" data-collapsed="true">展开</button>
+    </div>
+    <div class="tool-result-content" style="display: none;">
         <pre class="tool-result-data">${result}</pre>
       </div>
     </div>

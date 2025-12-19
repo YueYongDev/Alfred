@@ -1,6 +1,9 @@
+import logging
 from typing import Dict, List, Any
 
 from agents.core.messaging.chat_request import ChatRequest
+
+logger = logging.getLogger(__name__)
 
 
 def convert_chat_request_to_messages(request: ChatRequest) -> List[Dict[str, Any]]:
@@ -9,12 +12,7 @@ def convert_chat_request_to_messages(request: ChatRequest) -> List[Dict[str, Any
     """
     qa_messages: List[Dict[str, Any]] = []
 
-    # 支持新旧两种格式
-    messages = None
-    if request.body and request.body.messages:
-        messages = request.body.messages
-    elif request.data and request.data.messages:
-        messages = request.data.messages
+    messages = request.messages or []
 
     if messages:
         for m in messages:
@@ -25,6 +23,8 @@ def convert_chat_request_to_messages(request: ChatRequest) -> List[Dict[str, Any
 
             # 将 plugin role 转换为 function，因为 qwen_agent 不支持 plugin role
             if role == 'plugin':
+                role = 'function'
+            if role == 'tool':
                 role = 'function'
 
             # 获取 name 字段（如果存在）
@@ -88,7 +88,7 @@ def convert_chat_request_to_messages(request: ChatRequest) -> List[Dict[str, Any
                     message_dict["name"] = name
                 qa_messages.append(message_dict)
     else:
-        raise ValueError("chat requires data.messages")
+        raise ValueError("chat requires messages")
     return qa_messages
 
 
@@ -149,19 +149,14 @@ def extract_files_from_request(request: ChatRequest) -> List[Dict[str, str]]:
     # 从参数中提取文件列表（如果 parameters 是对象，尝试获取 extra 字段）
     files_param = None
     if request.parameters:
-        # 如果 parameters 是 Pydantic 对象
-        if hasattr(request.parameters, 'extra'):
-            files_param = request.parameters.extra.get("files") if request.parameters.extra else None
-        # 如果是字典（向后兼容）
-        elif isinstance(request.parameters, dict):
+        if isinstance(request.parameters, dict):
             files_param = request.parameters.get("files")
 
     files_list = _extract_files_from_param_list(files_param) if files_param else []
 
     # 从消息内容中提取文件（保留从消息结构中提取文件的功能，但仅用于获取file_id信息）
     message_files = _extract_files_from_messages_content(
-        getattr(request.body, 'messages', None) if request.body else
-        (getattr(request.data, 'messages', None) if request.data else None))
+        request.messages or [])
 
     # 合并两个列表，如果有重复的文件URL，用消息中的file_id更新参数中的file_id
     for file_item in message_files:
@@ -184,12 +179,7 @@ def extract_images_from_request(request: ChatRequest) -> List[str]:
     """
     images: List[str] = []
 
-    # 支持新旧两种格式
-    messages = None
-    if request.body and request.body.messages:
-        messages = request.body.messages
-    elif request.data and request.data.messages:
-        messages = request.data.messages
+    messages = request.messages or []
 
     if messages:
         for message in messages:

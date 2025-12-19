@@ -46,29 +46,15 @@ class QwenAgentContextBuilder:
         elif file_list:
             extracted_file_urls = file_list
 
-        # 组装服务端上下文（从 header.systemParams 获取）
-        system_params = {}
-        if request.header and request.header.systemParams:
-            system_params = {
-                "userId": request.header.systemParams.userId,
-                "sessionId": request.header.sessionId,
-                "securityLevel": getattr(request.header.systemParams, 'securityLevel', None),
-                "terminalType": getattr(request.header.systemParams, 'terminalType', None),
-                "osGroup": getattr(request.header.systemParams, 'osGroup', None),
-            }
-        # 向后兼容旧格式
-        elif request.session:
-            system_params = {
-                "userId": request.session.userId,
-                "sessionId": request.session.sessionId,
-            }
+        # 组装服务端上下文（从请求字段获取）
+        system_params = {
+            "userId": request.user_id,
+            "sessionId": request.session_id,
+        }
         ctx = AgentContext(
             effective_model="qwen3-max",
             user_id=system_params.get("userId"),
             session_id=system_params.get("sessionId"),
-            security_level=system_params.get("securityLevel"),
-            terminal_type=system_params.get("terminalType"),
-            os_group=system_params.get("osGroup"),
             files=extracted_file_urls,
             file_ids=[f.get("file_id") for f in file_list if isinstance(f, dict) and f.get("file_id")],
             images=image_list
