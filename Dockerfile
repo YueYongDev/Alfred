@@ -13,6 +13,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 COPY agents/ /app/agents/
 COPY tools/ /app/tools/
 COPY server/ /app/server/
+COPY static/ /app/static/
 COPY README.md /app/
 
 EXPOSE 11435
