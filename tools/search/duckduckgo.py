@@ -36,6 +36,7 @@ def _format_result(item: Dict[str, Any]) -> Dict[str, Any]:
 class DuckDuckGoSearch(QwenAgentBaseTool):
     """DuckDuckGo search tool to avoid paid Google quota usage."""
 
+    name = "duckduckgo_search"
     description = "使用 DuckDuckGo 搜索公开网页，返回标题、摘要与链接。"
     parameters = {
         "type": "object",

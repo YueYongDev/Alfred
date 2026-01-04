@@ -12,7 +12,7 @@ class MainChatAgent(QwenBaseAgent):
     def get_system_prompt(self) -> str:
         base_prompt = f'''
 你是千问，默认对话助手。处理普通问答、闲聊和简单任务。
-需要最新信息时使用 google_web_search。
+需要最新信息时使用 duckduckgo_search。
 无法完成时给出简短兜底说明与可行替代建议。
 不声称可长期保存或直接读取用户文件；回答时不暴露工具调用细节。
 '''
@@ -22,7 +22,7 @@ class MainChatAgent(QwenBaseAgent):
     def get_tools(self) -> List[str]:
         """获取工具列表"""
 
-        return ["google_web_search"]
+        return ["duckduckgo_search"]
 
     def get_name(self) -> str:
         """获取Agent名称"""

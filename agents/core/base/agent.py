@@ -76,11 +76,11 @@ class QwenBaseAgent(ABC):
         llm_config = self.get_llm_config()
 
         # 记录创建日志
-        logger.info(f"Creating {self.__class__.__name__} agent")
-        logger.info(f"{self.__class__.__name__} LLM Config: {json.dumps(llm_config, ensure_ascii=False)}")
-        logger.info(f"{self.__class__.__name__} System Prompt: {self.SYSTEM_PROMPT[:100]}...")
-        logger.info(
-            f"{self.__class__.__name__} Context: {json.dumps(self.context.model_dump() if self.context else {}, ensure_ascii=False)}")
+        # logger.info(f"Creating {self.__class__.__name__} agent")
+        # logger.info(f"{self.__class__.__name__} LLM Config: {json.dumps(llm_config, ensure_ascii=False)}")
+        # logger.info(f"{self.__class__.__name__} System Prompt: {self.SYSTEM_PROMPT[:100]}...")
+        # logger.info(
+        #     f"{self.__class__.__name__} Context: {json.dumps(self.context.model_dump() if self.context else {}, ensure_ascii=False)}")
 
         # 使用动态系统提示词
         system_prompt = self.get_system_prompt()

@@ -10,6 +10,7 @@ const state = {
   nodes: [], // { id, type, x, y, el, data }
   pan: { x: 0, y: 0 },
   isDraggingNode: false,
+  transform: { x: 0, y: 0, k: 1 },
 };
 
 const els = {

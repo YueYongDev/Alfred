@@ -5,14 +5,35 @@ from typing import List, Optional
 from agents.core.context.builder import AgentContext
 from tools.core.base import QwenAgentBaseTool
 from tools.search.duckduckgo import DuckDuckGoSearch
-from tools.search.google import GoogleWebSearch
+from tools.utility.email import SendEmailTool
+from tools.public_api.art import ArtSearchTool
+from tools.public_api.books import BookSearchTool, GutenbergSearchTool
+from tools.public_api.calendar import NamedayLookupTool, PublicHolidaysTool
+from tools.public_api.crypto import CryptoMarketTool, CryptoPriceTool
+from tools.public_api.news import SpaceflightNewsTool
+from tools.public_api.poetry import PoetrySearchTool
+from tools.public_api.science import ArxivSearchTool, LaunchLibraryTool
+from tools.public_api.utility import PublicIPTool, RandomActivityTool
 
 logger = logging.getLogger(__name__)
 
 # 工具实例列表
 _all_qwen_tools = [
     DuckDuckGoSearch(),
-    GoogleWebSearch(),
+    SendEmailTool(),
+    PublicHolidaysTool(),
+    NamedayLookupTool(),
+    BookSearchTool(),
+    GutenbergSearchTool(),
+    PoetrySearchTool(),
+    SpaceflightNewsTool(),
+    CryptoPriceTool(),
+    CryptoMarketTool(),
+    ArxivSearchTool(),
+    LaunchLibraryTool(),
+    ArtSearchTool(),
+    PublicIPTool(),
+    RandomActivityTool(),
 ]
 _tool_map_by_name = {tool.name: tool for tool in _all_qwen_tools}
 

@@ -13,6 +13,7 @@ from agents.core.stream.event_stream_handler import EventStreamHandler
 from agents.multimodal.image_agent import ImageAgent
 from agents.pim.pim_agent import PIMAgent
 from agents.planning.planning_agent import PlanningAgent
+from agents.public_api.public_api_agent import PublicAPIAgent
 from server import config
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,9 @@ class AgentRouter:
         # 个人信息管理Agent（邮件、日程、出行）
         bot_pim = PIMAgent(ctx).create_agent()
 
+        # 公共API Agent（节假日、图书、行情、论文等）
+        bot_public_api = PublicAPIAgent(ctx).create_agent()
+
         # 任务编排Agent（根据workflow编排子agent）
         bot_plan = PlanningAgent(bot_basic_chat, bot_image, bot_pim).create_agent()
 
@@ -85,7 +89,7 @@ class AgentRouter:
         }
         main_chat_router = QwenAgentRouter(
             llm=main_chat_router_llm_config,
-            agents=[bot_basic_chat, bot_image, bot_pim, bot_plan],  # MainChatAgent放在第一位作为默认兜底
+            agents=[bot_basic_chat, bot_image, bot_pim, bot_public_api, bot_plan],  # MainChatAgent放在第一位作为默认兜底
             function_list=[],
         )
         return main_chat_router

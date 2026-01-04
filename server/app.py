@@ -55,6 +55,21 @@ def _tool_meta(tool: Any, agent_name: str) -> Dict[str, Any]:
         Dict[str, Any]: 工具元数据字典
     """
     try:
+        if isinstance(tool, str):
+            return {
+                "name": tool,
+                "description": "",
+                "parameters": {},
+                "agent": agent_name,
+            }
+        if isinstance(tool, dict):
+            return {
+                "name": tool.get("name", "tool"),
+                "description": (tool.get("description") or "").strip(),
+                "parameters": tool.get("parameters", {}) or {},
+                "agent": tool.get("agent", agent_name),
+            }
+
         # 获取工具名称
         name = getattr(tool, 'name', str(tool.__class__.__name__))
 
@@ -100,7 +115,7 @@ def get_agent_metadata() -> Dict[str, Any]:
 
     router = AgentRouter(temp_request)
     # 创建bot实例
-    router._create_bot()
+    router.bot = router._create_bot()
 
     agents_data: List[Dict[str, Any]] = []
     tools_data: List[Dict[str, Any]] = []
@@ -225,9 +240,7 @@ async def chat_completions(request: Request):
             # 后端日志观测每个 SSE chunk（长度截断）
             try:
                 preview = event if isinstance(event, str) else str(event)
-                if len(preview) > 500:
-                    preview = preview[:500] + "...(truncated)"
-                logger.info("[SSE] sending chunk: %s", preview)
+                # logger.info("[SSE] sending chunk: %s", preview)
             except Exception:
                 logger.info("[SSE] sending chunk: <unserializable>")
             yield event
