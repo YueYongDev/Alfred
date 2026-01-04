@@ -89,7 +89,74 @@ def convert_chat_request_to_messages(request: ChatRequest) -> List[Dict[str, Any
                 qa_messages.append(message_dict)
     else:
         raise ValueError("chat requires messages")
-    return qa_messages
+    normalized = _normalize_message_roles(qa_messages)
+    if not normalized:
+        raise ValueError("chat requires at least one user message")
+    return normalized
+
+
+def _normalize_message_roles(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Ensure roles alternate user/assistant/... by merging consecutive same-role messages
+    and dropping any leading non-user entries.
+    """
+    if not messages:
+        return []
+
+    # Drop leading non-user messages to satisfy strict alternation requirements.
+    start_idx = 0
+    found_user = False
+    for idx, msg in enumerate(messages):
+        if msg.get("role") == "user":
+            start_idx = idx
+            found_user = True
+            break
+    if not found_user:
+        return []
+    messages = messages[start_idx:]
+
+    merged: List[Dict[str, Any]] = []
+    for msg in messages:
+        if not merged:
+            merged.append(dict(msg))
+            continue
+        last = merged[-1]
+        if msg.get("role") == last.get("role"):
+            merged[-1] = _merge_same_role_message(last, msg)
+        else:
+            merged.append(dict(msg))
+    return merged
+
+
+def _merge_same_role_message(base: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
+    merged = dict(base)
+    if not merged.get("name") and incoming.get("name"):
+        merged["name"] = incoming["name"]
+    merged["content"] = _merge_message_content(
+        merged.get("content"),
+        incoming.get("content"),
+    )
+    return merged
+
+
+def _merge_message_content(left: Any, right: Any) -> Any:
+    if left in (None, ""):
+        return right
+    if right in (None, ""):
+        return left
+    if isinstance(left, str) and isinstance(right, str):
+        return f"{left}\n\n{right}"
+    if isinstance(left, list) and isinstance(right, list):
+        return left + right
+
+    def _to_list(value: Any) -> List[Any]:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            return [{"text": value}]
+        return [value]
+
+    return _to_list(left) + _to_list(right)
 
 
 def _add_file_to_list(files_list: List[Dict[str, str]], file_url: str, file_id: str = "") -> None:

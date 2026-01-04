@@ -53,6 +53,7 @@ class EventStreamHandler:
             for chunk in result:
                 try:
                     payload = jsonable_encoder(chunk)
+                    logger.warning(f"[stream-output] payload={payload}")
                     yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
                 except Exception as e:
                     logger.warning(f"Failed to emit chunk: type={type(chunk)}, task_id={self.task_id}, error={e}")
